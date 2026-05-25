@@ -207,8 +207,15 @@ telegram({
 Trigger from client:
 
 ```typescript
+// default: same-tab redirect
 await authClient.signInWithTelegramOIDC({
   callbackURL: "/dashboard",
+});
+
+// optional: popup flow
+await authClient.signInWithTelegramOIDC({
+  callbackURL: "/dashboard",
+  flow: "popup",
 });
 ```
 
@@ -241,6 +248,7 @@ export function TelegramOIDCLogin() {
       onClick={() =>
         authClient.signInWithTelegramOIDC({
           callbackURL: "/dashboard",
+          flow: "popup",
         })
       }
     >

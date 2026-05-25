@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 
 export default function OIDCPage() {
   const router = useRouter();
+  const [flow, setFlow] = useState<"popup" | "redirect">("redirect");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,6 +18,7 @@ export default function OIDCPage() {
       await authClient.signInWithTelegramOIDC({
         callbackURL: "/dashboard",
         errorCallbackURL: "/oidc?error=auth_failed",
+        flow,
       });
     } catch (err: any) {
       console.error("OIDC sign-in error:", err);
@@ -47,14 +49,49 @@ export default function OIDCPage() {
                 <code className="rounded bg-green-100 px-1">
                   oauth.telegram.org
                 </code>
-                . This redirects you to Telegram's OAuth page where you
-                authorize the bot.
+                . Choose between same-tab redirect or popup flow below.
               </p>
               <ul className="list-inside list-disc space-y-1 text-green-700 text-sm">
                 <li>RS256 JWT ID token verification via JWKS</li>
                 <li>Phone number access (if configured)</li>
                 <li>Bot access permission (if configured)</li>
               </ul>
+            </div>
+
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="mb-3 font-medium text-blue-900 text-sm">
+                Flow mode
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    flow === "redirect"
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-blue-200 bg-white text-blue-800 hover:border-blue-300"
+                  }`}
+                  onClick={() => setFlow("redirect")}
+                  type="button"
+                >
+                  Redirect (same tab)
+                </button>
+                <button
+                  className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                    flow === "popup"
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-blue-200 bg-white text-blue-800 hover:border-blue-300"
+                  }`}
+                  onClick={() => setFlow("popup")}
+                  type="button"
+                >
+                  Popup window
+                </button>
+              </div>
+              <p className="mt-2 text-blue-700 text-xs">
+                Selected:{" "}
+                {flow === "popup"
+                  ? "Popup mode (falls back to same tab if blocked)"
+                  : "Same-tab redirect mode"}
+              </p>
             </div>
 
             <button
@@ -65,10 +102,12 @@ export default function OIDCPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-white border-b-2" />
-                  Redirecting to Telegram...
+                  {flow === "popup"
+                    ? "Opening Telegram popup..."
+                    : "Redirecting to Telegram..."}
                 </span>
               ) : (
-                "Sign in with Telegram OIDC"
+                `Sign in with Telegram OIDC (${flow})`
               )}
             </button>
 

@@ -6,9 +6,19 @@
 import { useState } from "react";
 import { authClient } from "../lib/auth-client";
 
-export function TelegramOIDCButton() {
+interface TelegramOIDCButtonProps {
+  flow?: "popup" | "redirect";
+}
+
+export function TelegramOIDCButton({
+  flow = "redirect",
+}: TelegramOIDCButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  let buttonLabel = `Sign in with Telegram (${flow})`;
+  if (loading) {
+    buttonLabel = flow === "popup" ? "Opening popup..." : "Redirecting...";
+  }
 
   const handleSignIn = async () => {
     setLoading(true);
@@ -17,6 +27,7 @@ export function TelegramOIDCButton() {
     try {
       await authClient.signInWithTelegramOIDC({
         callbackURL: "/dashboard",
+        flow,
       });
     } catch {
       setError("Failed to start OIDC flow");
@@ -31,7 +42,7 @@ export function TelegramOIDCButton() {
         disabled={loading}
         onClick={handleSignIn}
       >
-        {loading ? "Redirecting..." : "Sign in with Telegram"}
+        {buttonLabel}
       </button>
 
       {error && <div className="text-red-600 text-sm">{error}</div>}

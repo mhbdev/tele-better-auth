@@ -1032,6 +1032,7 @@ describe("Client signInWithTelegramOIDC", () => {
         provider: "telegram-oidc",
         callbackURL: undefined,
         errorCallbackURL: undefined,
+        disableRedirect: undefined,
       },
     });
   });
@@ -1053,6 +1054,7 @@ describe("Client signInWithTelegramOIDC", () => {
         provider: "telegram-oidc",
         callbackURL: "/dashboard",
         errorCallbackURL: undefined,
+        disableRedirect: undefined,
       },
     });
   });
@@ -1075,6 +1077,7 @@ describe("Client signInWithTelegramOIDC", () => {
         provider: "telegram-oidc",
         callbackURL: "/dashboard",
         errorCallbackURL: "/error",
+        disableRedirect: undefined,
       },
     });
   });
@@ -1097,9 +1100,78 @@ describe("Client signInWithTelegramOIDC", () => {
         provider: "telegram-oidc",
         callbackURL: "/dashboard",
         errorCallbackURL: undefined,
+        disableRedirect: undefined,
       },
       headers: { "X-Custom": "value" },
     });
+  });
+
+  it("should support popup flow with disableRedirect", async () => {
+    mockFetch.mockResolvedValueOnce({
+      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
+    });
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.signInWithTelegramOIDC({
+      callbackURL: "/dashboard",
+      flow: "popup",
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
+      method: "POST",
+      body: {
+        provider: "telegram-oidc",
+        callbackURL: "/dashboard",
+        errorCallbackURL: undefined,
+        disableRedirect: true,
+      },
+    });
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://oauth.telegram.org/auth?client_id=123",
+      "telegram-oidc-login",
+      expect.stringContaining("popup=yes")
+    );
+  });
+
+  it("should fall back to same-tab when popup is blocked", async () => {
+    mockFetch.mockResolvedValueOnce({
+      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
+    });
+    vi.spyOn(window, "open").mockReturnValue(null);
+    const assignSpy = vi
+      .spyOn(window.location, "assign")
+      .mockImplementation(() => {});
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.signInWithTelegramOIDC({
+      flow: "popup",
+    });
+
+    expect(assignSpy).toHaveBeenCalledWith(
+      "https://oauth.telegram.org/auth?client_id=123"
+    );
+  });
+
+  it("should not open popup when popup URL is missing", async () => {
+    mockFetch.mockResolvedValueOnce({ data: {} });
+    const openSpy = vi.spyOn(window, "open");
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.signInWithTelegramOIDC({
+      flow: "popup",
+    });
+
+    expect(openSpy).not.toHaveBeenCalled();
   });
 
   it("should return response from fetch", async () => {
@@ -1146,6 +1218,7 @@ describe("Client signInWithTelegramOIDC", () => {
         provider: "telegram-oidc",
         callbackURL: undefined,
         errorCallbackURL: undefined,
+        disableRedirect: undefined,
       },
     });
   });

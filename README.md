@@ -234,8 +234,15 @@ telegram({
 Then on client:
 
 ```typescript
+// default: same-tab redirect
 await authClient.signInWithTelegramOIDC({
   callbackURL: "/dashboard",
+});
+
+// optional: popup flow (falls back to same-tab if popup is blocked)
+await authClient.signInWithTelegramOIDC({
+  callbackURL: "/dashboard",
+  flow: "popup",
 });
 ```
 

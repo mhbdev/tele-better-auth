@@ -333,19 +333,29 @@ try {
 
 #### `signInWithTelegramOIDC(options?)`
 
-Trigger the Telegram OIDC sign-in flow. Redirects to `oauth.telegram.org` for authentication, then back to your callback URL. Standard Better Auth social login under the hood — PKCE, state tokens, the works. Only works when `oidc.enabled` is `true` on the server.
+Trigger the Telegram OIDC sign-in flow. Supports same-tab redirect (default) or popup mode. Standard Better Auth social login under the hood — PKCE, state tokens, the works. Only works when `oidc.enabled` is `true` on the server.
 
 ```typescript
+// same-tab redirect (default)
 await authClient.signInWithTelegramOIDC({
   callbackURL: "/dashboard",
+});
+
+// popup mode
+await authClient.signInWithTelegramOIDC({
+  callbackURL: "/dashboard",
+  flow: "popup",
 });
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `options.callbackURL` | `string` | URL to redirect after authentication |
+| `options.errorCallbackURL` | `string` | URL to redirect if authentication fails |
+| `options.flow` | `"redirect" \| "popup"` | Flow mode. Default is `"redirect"` |
+| `options.popup` | `TelegramOIDCPopupOptions` | Popup size/position/name/options when `flow: "popup"` |
 
-**Returns:** Redirects the browser. After callback, user has a session.
+**Returns:** Social sign-in response from Better Auth. In popup mode, the OAuth URL is opened in `window.open(...)`.
 
 ---
 

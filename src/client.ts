@@ -24,6 +24,10 @@ const TELEGRAM_LOGIN_SCRIPT = "https://telegram.org/js/telegram-login.js";
 
 type TelegramLoginRequestAccess = "phone" | "write";
 
+const DEFAULT_OIDC_POPUP_HEIGHT = 720;
+const DEFAULT_OIDC_POPUP_NAME = "telegram-oidc-login";
+const DEFAULT_OIDC_POPUP_WIDTH = 520;
+
 /**
  * Style variants supported by telegram-login.js buttons.
  * "rounded" is the default style.
@@ -163,6 +167,85 @@ interface TelegramIdTokenSignInOptions {
   nonce?: string;
   refreshToken?: string;
   requestSignUp?: boolean;
+}
+
+/**
+ * OIDC authorization flow mode.
+ * - redirect: navigate the current tab (default behavior)
+ * - popup: open Telegram OAuth in a popup window
+ */
+export type TelegramOIDCFlow = "popup" | "redirect";
+
+/**
+ * Popup behavior for OIDC sign-in flow.
+ */
+export interface TelegramOIDCPopupOptions {
+  /**
+   * Full window features string passed to window.open.
+   * If provided, width/height/top/left are ignored.
+   */
+  features?: string;
+
+  /**
+   * Popup height in pixels.
+   * @default 720
+   */
+  height?: number;
+
+  /**
+   * Left offset in pixels.
+   * By default, the popup is horizontally centered.
+   */
+  left?: number;
+
+  /**
+   * Popup window name/target.
+   * @default "telegram-oidc-login"
+   */
+  name?: string;
+
+  /**
+   * Top offset in pixels.
+   * By default, the popup is vertically centered.
+   */
+  top?: number;
+
+  /**
+   * Popup width in pixels.
+   * @default 520
+   */
+  width?: number;
+}
+
+/**
+ * Options for Telegram OIDC redirect/popup sign-in.
+ */
+export interface TelegramOIDCSignInOptions {
+  /**
+   * URL to redirect after authentication.
+   */
+  callbackURL?: string;
+
+  /**
+   * URL to redirect if authentication fails.
+   */
+  errorCallbackURL?: string;
+
+  /**
+   * OAuth flow mode.
+   * @default "redirect"
+   */
+  flow?: TelegramOIDCFlow;
+
+  /**
+   * Popup options, used when flow is "popup".
+   */
+  popup?: TelegramOIDCPopupOptions;
+}
+
+interface OAuthRedirectResponse {
+  redirect?: boolean;
+  url?: string;
 }
 
 interface TelegramLoginInitOptions {
@@ -336,6 +419,53 @@ function getContainerOrThrow(containerId: string): WidgetContainer {
     throw new Error(`Container with id "${containerId}" not found`);
   }
   return container;
+}
+
+function buildOIDCPopupFeatures(
+  popupOptions?: TelegramOIDCPopupOptions
+): string {
+  if (popupOptions?.features) {
+    return popupOptions.features;
+  }
+
+  const width = popupOptions?.width ?? DEFAULT_OIDC_POPUP_WIDTH;
+  const height = popupOptions?.height ?? DEFAULT_OIDC_POPUP_HEIGHT;
+  const left =
+    popupOptions?.left ??
+    Math.max(window.screenX + (window.outerWidth - width) / 2, 0);
+  const top =
+    popupOptions?.top ??
+    Math.max(window.screenY + (window.outerHeight - height) / 2, 0);
+
+  return [
+    "popup=yes",
+    `width=${Math.round(width)}`,
+    `height=${Math.round(height)}`,
+    `left=${Math.round(left)}`,
+    `top=${Math.round(top)}`,
+    "noopener=yes",
+  ].join(",");
+}
+
+function openOIDCPopup(url: string, popupOptions?: TelegramOIDCPopupOptions) {
+  if (typeof window === "undefined") {
+    throw new Error("Telegram OIDC popup flow can only be used in browser");
+  }
+
+  const popupName = popupOptions?.name ?? DEFAULT_OIDC_POPUP_NAME;
+  const popupWindow = window.open(
+    url,
+    popupName,
+    buildOIDCPopupFeatures(popupOptions)
+  );
+
+  if (popupWindow) {
+    popupWindow.focus();
+    return;
+  }
+
+  // Popup blocked: gracefully fall back to same-tab navigation.
+  window.location.assign(url);
 }
 
 /**
@@ -721,21 +851,31 @@ export const telegramClient = () => {
          * @param fetchOptions - Optional fetch options
          */
         signInWithTelegramOIDC: async (
-          options?: {
-            callbackURL?: string;
-            errorCallbackURL?: string;
-          },
+          options?: TelegramOIDCSignInOptions,
           fetchOptions?: FetchOptions
         ) => {
-          return await $fetch("/sign-in/social", {
-            method: "POST",
-            body: {
-              provider: "telegram-oidc",
-              callbackURL: options?.callbackURL,
-              errorCallbackURL: options?.errorCallbackURL,
-            },
-            ...fetchOptions,
-          });
+          const flow = options?.flow ?? "redirect";
+          const usePopup = flow === "popup";
+
+          const response = await $fetch<OAuthRedirectResponse>(
+            "/sign-in/social",
+            {
+              method: "POST",
+              body: {
+                provider: "telegram-oidc",
+                callbackURL: options?.callbackURL,
+                errorCallbackURL: options?.errorCallbackURL,
+                disableRedirect: usePopup ? true : undefined,
+              },
+              ...fetchOptions,
+            }
+          );
+
+          if (usePopup && response?.data?.url) {
+            openOIDCPopup(response.data.url, options?.popup);
+          }
+
+          return response;
         },
       };
     },
