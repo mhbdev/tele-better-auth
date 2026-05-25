@@ -1,5 +1,5 @@
 {
-  "name": "better-auth-telegram-test",
+  "name": "tele-better-auth-test",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "better-auth": "^1.5.0",
-    "better-auth-telegram": "file:..",
+    "better-auth": "^1.6.11",
+    "tele-better-auth": "file:..",
     "better-sqlite3": "^12.6.2",
     "next": "^16.1.6",
     "react": "^19.2.4",

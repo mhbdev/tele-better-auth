@@ -256,7 +256,7 @@ The `telegram-oidc` provider isn't being injected. Check:
 
 1. `oidc.enabled` is `true` in your server config
 2. You're calling `signInWithTelegramOIDC()` from the client, not some hand-rolled fetch
-3. Better Auth version is `^1.5.0` — older versions may not support the `init` hook correctly
+3. Better Auth version is `^1.6.11` — older versions may not support the `init` hook correctly
 
 ### OIDC Redirects to Telegram But Callback Fails
 
@@ -351,7 +351,7 @@ Every error this plugin can throw, mapped to what actually went wrong:
 ### What to Include When Reporting Issues
 
 ```bash
-npm list better-auth-telegram    # plugin version
+npm list tele-better-auth    # plugin version
 node --version                   # Node.js version
 ```
 
@@ -359,7 +359,7 @@ Plus: your framework, the error message (full text), and steps to reproduce. San
 
 ### Where to Go
 
-- **GitHub Issues:** [github.com/vcode-sh/better-auth-telegram/issues](https://github.com/vcode-sh/better-auth-telegram/issues)
+- **GitHub Issues:** [github.com/vcode-sh/tele-better-auth/issues](https://github.com/vcode-sh/tele-better-auth/issues)
 - **Better Auth Discord:** [better-auth.com/discord](https://better-auth.com/discord)
 
 ### Before You Open an Issue
@@ -376,3 +376,5 @@ Plus: your framework, the error message (full text), and steps to reproduce. San
 - [Configuration Guide](./configuration.md)
 - [API Reference](./api-reference.md)
 - [Usage Examples](./usage.md)
+
+

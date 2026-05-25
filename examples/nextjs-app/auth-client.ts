@@ -4,7 +4,7 @@
 "use client";
 
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
   baseURL:

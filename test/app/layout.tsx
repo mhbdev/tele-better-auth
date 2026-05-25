@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Better Auth + Telegram Test",
-  description: "Testing better-auth-telegram plugin",
+  description: "Testing tele-better-auth plugin",
 };
 
 export default function RootLayout({

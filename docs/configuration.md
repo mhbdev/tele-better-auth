@@ -1,6 +1,6 @@
 # Configuration
 
-Everything you can tweak, nothing you can't. No database adapters, no session philosophy, no framework tours -- that's [Better Auth's job](https://www.better-auth.com/docs). This page is strictly about what `better-auth-telegram` gives you to misconfigure.
+Everything you can tweak, nothing you can't. No database adapters, no session philosophy, no framework tours -- that's [Better Auth's job](https://www.better-auth.com/docs). This page is strictly about what `tele-better-auth` gives you to misconfigure.
 
 ## Server Configuration
 
@@ -10,7 +10,7 @@ Two strings. That's it. Revolutionary.
 
 ```typescript
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   database: /* your database config */,
@@ -172,7 +172,7 @@ telegram({
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
   plugins: [telegramClient()],
@@ -226,3 +226,4 @@ Get the bot token from [@BotFather](https://t.me/BotFather). The username is wha
 - [Mini Apps Guide](./miniapps.md) -- building inside Telegram
 - [Security](./security.md) -- the part you should actually read
 - [Troubleshooting](./troubleshooting.md) -- when it all goes sideways
+

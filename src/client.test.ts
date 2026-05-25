@@ -42,6 +42,12 @@ describe("telegramClient", () => {
       expect(actions).toHaveProperty("getTelegramConfig");
       expect(actions).toHaveProperty("initTelegramWidget");
       expect(actions).toHaveProperty("initTelegramWidgetRedirect");
+      expect(actions).toHaveProperty("initTelegramLogin");
+      expect(actions).toHaveProperty("openTelegramLogin");
+      expect(actions).toHaveProperty("authWithTelegramLogin");
+      expect(actions).toHaveProperty("renderTelegramLoginButton");
+      expect(actions).toHaveProperty("closeTelegramLogin");
+      expect(actions).toHaveProperty("signInWithTelegramOIDCIdToken");
     });
 
     it("should have all actions as functions", () => {
@@ -53,6 +59,12 @@ describe("telegramClient", () => {
       expect(typeof actions.getTelegramConfig).toBe("function");
       expect(typeof actions.initTelegramWidget).toBe("function");
       expect(typeof actions.initTelegramWidgetRedirect).toBe("function");
+      expect(typeof actions.initTelegramLogin).toBe("function");
+      expect(typeof actions.openTelegramLogin).toBe("function");
+      expect(typeof actions.authWithTelegramLogin).toBe("function");
+      expect(typeof actions.renderTelegramLoginButton).toBe("function");
+      expect(typeof actions.closeTelegramLogin).toBe("function");
+      expect(typeof actions.signInWithTelegramOIDCIdToken).toBe("function");
     });
   });
 
@@ -517,6 +529,153 @@ describe("telegramClient", () => {
     });
   });
 
+  describe("Telegram Login JS API", () => {
+    beforeEach(() => {
+      const container = document.createElement("div");
+      container.id = "telegram-login";
+      document.body.appendChild(container);
+
+      (window as any).Telegram = {
+        Login: {
+          init: vi.fn(),
+          open: vi.fn(),
+          auth: vi.fn(),
+          close: vi.fn(),
+        },
+      };
+
+      mockFetch.mockResolvedValue({
+        data: {
+          botUsername: "test_bot",
+          loginWidgetEnabled: true,
+          miniAppEnabled: false,
+          oidcEnabled: true,
+          oidcClientId: "123456789",
+          testMode: false,
+        },
+      });
+    });
+
+    it("should init Telegram.Login with server-provided client ID", async () => {
+      const actions = client.getActions(mockFetch);
+      const callback = vi.fn();
+
+      await actions.initTelegramLogin({}, callback);
+
+      const telegramLogin = (window as any).Telegram.Login;
+      expect(telegramLogin.init).toHaveBeenCalledTimes(1);
+      expect(telegramLogin.init).toHaveBeenCalledWith(
+        { client_id: 123456789 },
+        callback
+      );
+    });
+
+    it("should pass request_access/lang/nonce to Telegram.Login.init", async () => {
+      const actions = client.getActions(mockFetch);
+
+      await actions.initTelegramLogin({
+        requestAccess: ["phone", "write"],
+        lang: "en",
+        nonce: "nonce-1",
+      });
+
+      const telegramLogin = (window as any).Telegram.Login;
+      expect(telegramLogin.init).toHaveBeenCalledWith(
+        {
+          client_id: 123456789,
+          request_access: ["phone", "write"],
+          lang: "en",
+          nonce: "nonce-1",
+        },
+        undefined
+      );
+    });
+
+    it("should call Telegram.Login.auth with explicit clientId override", async () => {
+      const actions = client.getActions(mockFetch);
+      const callback = vi.fn();
+
+      await actions.authWithTelegramLogin(
+        {
+          clientId: "999999999",
+          requestAccess: "phone",
+        },
+        callback
+      );
+
+      const telegramLogin = (window as any).Telegram.Login;
+      expect(telegramLogin.auth).toHaveBeenCalledWith(
+        {
+          client_id: 999999999,
+          request_access: ["phone"],
+        },
+        callback
+      );
+    });
+
+    it("should open and close login popup through Telegram.Login API", async () => {
+      const actions = client.getActions(mockFetch);
+      const callback = vi.fn();
+
+      await actions.openTelegramLogin(callback);
+      await actions.closeTelegramLogin();
+
+      const telegramLogin = (window as any).Telegram.Login;
+      expect(telegramLogin.open).toHaveBeenCalledWith(callback);
+      expect(telegramLogin.close).toHaveBeenCalledTimes(1);
+    });
+
+    it("should render tg-auth-button and initialize login API", async () => {
+      const actions = client.getActions(mockFetch);
+
+      await actions.renderTelegramLoginButton("telegram-login", {
+        text: "Continue with Telegram",
+        style: ["outlined", "shine"],
+      });
+
+      const button = document.querySelector(
+        "#telegram-login .tg-auth-button"
+      ) as HTMLButtonElement | null;
+
+      expect(button).toBeTruthy();
+      expect(button?.textContent).toBe("Continue with Telegram");
+      expect(button?.getAttribute("data-style")).toBe("outlined shine");
+
+      const telegramLogin = (window as any).Telegram.Login;
+      expect(telegramLogin.init).toHaveBeenCalledWith(
+        { client_id: 123456789 },
+        undefined
+      );
+    });
+
+    it("should sign in with ID token via /sign-in/social", async () => {
+      const actions = client.getActions(mockFetch);
+
+      await actions.signInWithTelegramOIDCIdToken("jwt-token", {
+        nonce: "nonce-1",
+        callbackURL: "/dashboard",
+      });
+
+      expect(mockFetch).toHaveBeenLastCalledWith("/sign-in/social", {
+        method: "POST",
+        body: {
+          provider: "telegram-oidc",
+          callbackURL: "/dashboard",
+          errorCallbackURL: undefined,
+          newUserCallbackURL: undefined,
+          disableRedirect: undefined,
+          requestSignUp: undefined,
+          idToken: {
+            token: "jwt-token",
+            nonce: "nonce-1",
+            accessToken: undefined,
+            refreshToken: undefined,
+          },
+        },
+      });
+    });
+  });
+
   describe("Error handling", () => {
     it("should handle fetch errors in signInWithTelegram", async () => {
       const error = new Error("Network error");
@@ -951,7 +1110,7 @@ describe("telegramClient", () => {
       expect(result.data?.testMode).toBe(true);
     });
 
-    it("should return exactly the shape { botUsername, testMode } from config", async () => {
+    it("should include botUsername and testMode in config response", async () => {
       const expectedResponse = {
         data: {
           botUsername: "production_bot",
@@ -963,7 +1122,7 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
       const result = await actions.getTelegramConfig();
 
-      // Verify the exact keys we expect
+      // Verify required keys are present
       expect(Object.keys(result.data!)).toContain("botUsername");
       expect(Object.keys(result.data!)).toContain("testMode");
     });
@@ -996,6 +1155,16 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
       expect(actions).toHaveProperty("signInWithTelegramOIDC");
       expect(typeof actions.signInWithTelegramOIDC).toBe("function");
+    });
+
+    it("should include new Telegram Login JS API actions", () => {
+      const actions = client.getActions(mockFetch);
+      expect(actions).toHaveProperty("initTelegramLogin");
+      expect(actions).toHaveProperty("openTelegramLogin");
+      expect(actions).toHaveProperty("authWithTelegramLogin");
+      expect(actions).toHaveProperty("renderTelegramLoginButton");
+      expect(actions).toHaveProperty("closeTelegramLogin");
+      expect(actions).toHaveProperty("signInWithTelegramOIDCIdToken");
     });
   });
 

@@ -32,6 +32,7 @@ export interface TelegramPluginConfig {
   miniAppEnabled: boolean;
   miniAppValidateInitData: boolean;
   oidc?: TelegramOIDCOptions;
+  oidcClientId: string;
   oidcEnabled: boolean;
   testMode: boolean;
   widgetEnabled: boolean;
@@ -68,10 +69,11 @@ export function createPluginConfig(
   const widgetEnabled = loginWidget !== false;
   const miniAppEnabled = miniApp?.enabled ?? false;
   const oidcEnabled = oidc?.enabled ?? false;
+  const oidcClientId = oidc?.clientId || botToken.split(":")[0]!;
 
   if (testMode && oidcEnabled) {
     console.warn(
-      "[better-auth-telegram] testMode is enabled with OIDC. Telegram's OIDC endpoint (oauth.telegram.org) has no documented test variant — OIDC authentication may not work with test server bot tokens."
+      "[tele-better-auth] testMode is enabled with OIDC. Telegram's OIDC endpoint (oauth.telegram.org) has no documented test variant — OIDC authentication may not work with test server bot tokens."
     );
   }
 
@@ -90,5 +92,6 @@ export function createPluginConfig(
     mapTelegramDataToUser,
     mapMiniAppDataToUser: miniApp?.mapMiniAppDataToUser,
     oidc,
+    oidcClientId,
   };
 }

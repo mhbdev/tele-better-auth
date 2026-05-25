@@ -8,7 +8,7 @@ If you haven't set up the client yet, go read [Installation](./installation.md).
 
 ```ts
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 const authClient = createAuthClient({
   baseURL: "http://localhost:3000",
@@ -314,7 +314,7 @@ No React? No problem. Same API, fewer hooks cluttering your life.
 
 <script type="module">
   import { createAuthClient } from "better-auth/client";
-  import { telegramClient } from "better-auth-telegram/client";
+  import { telegramClient } from "tele-better-auth/client";
 
   const authClient = createAuthClient({
     baseURL: window.location.origin,
@@ -343,3 +343,4 @@ No React? No problem. Same API, fewer hooks cluttering your life.
 - [API Reference](./api-reference.md) -- every endpoint, documented
 - [Security](./security.md) -- how verification works
 - [Troubleshooting](./troubleshooting.md) -- when things go sideways
+

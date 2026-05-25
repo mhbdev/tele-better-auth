@@ -2,7 +2,7 @@
 
 Your web app, living inside Telegram. No login popups, no OAuth dances, no "please verify your email." The user opened your Mini App — they're already Telegram. Act accordingly.
 
-Works with `better-auth-telegram` v0.4.0+ and `better-auth@^1.5.0`.
+Works with `tele-better-auth` v0.4.0+ and `better-auth@^1.6.11`.
 
 ## Mini Apps vs Login Widget
 
@@ -43,7 +43,7 @@ Update your Mini App URL in BotFather (`/myapps` -> Edit Web App URL) to the ngr
 
 ```typescript
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   database: /* your database */,
@@ -106,7 +106,7 @@ Add this to your HTML `<head>`:
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
@@ -267,4 +267,6 @@ All of this runs on Web Crypto API (`crypto.subtle`) — no Node-specific deps, 
 - [Telegram Mini Apps Docs](https://core.telegram.org/bots/webapps)
 - [Telegram WebApp API](https://core.telegram.org/bots/webapps#initializing-mini-apps)
 - [Better Auth](https://better-auth.com)
-- [GitHub](https://github.com/vcode-sh/better-auth-telegram)
+- [GitHub](https://github.com/vcode-sh/tele-better-auth)
+
+

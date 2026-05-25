@@ -891,7 +891,7 @@ describe("Plugin integration", () => {
       warnSpy.mockRestore();
     });
 
-    it("should include [better-auth-telegram] prefix and oauth.telegram.org in warning", async () => {
+    it("should include [tele-better-auth] prefix and oauth.telegram.org in warning", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const { telegram } = await import("./index");
@@ -903,7 +903,7 @@ describe("Plugin integration", () => {
       });
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[better-auth-telegram]")
+        expect.stringContaining("[tele-better-auth]")
       );
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining("oauth.telegram.org")
@@ -1224,7 +1224,7 @@ describe("Adversarial: testMode option", () => {
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
-      "[better-auth-telegram] testMode is enabled with OIDC. Telegram's OIDC endpoint (oauth.telegram.org) has no documented test variant — OIDC authentication may not work with test server bot tokens."
+      "[tele-better-auth] testMode is enabled with OIDC. Telegram's OIDC endpoint (oauth.telegram.org) has no documented test variant — OIDC authentication may not work with test server bot tokens."
     );
   });
 

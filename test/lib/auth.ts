@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { telegram } from "better-auth-telegram";
+import type { TelegramAuthData, TelegramMiniAppUser } from "tele-better-auth";
+import { telegram } from "tele-better-auth";
 
 const prisma = new PrismaClient();
 
@@ -24,7 +25,7 @@ export const auth = betterAuth({
       autoCreateUser: true,
       maxAuthAge: 86400, // 24 hours
 
-      mapTelegramDataToUser: (data) => ({
+      mapTelegramDataToUser: (data: TelegramAuthData) => ({
         name: data.username || data.first_name,
         image: data.photo_url,
         email: undefined, // Telegram doesn't provide email
@@ -35,7 +36,7 @@ export const auth = betterAuth({
         enabled: true,
         validateInitData: true,
         allowAutoSignin: true,
-        mapMiniAppDataToUser: (user) => ({
+        mapMiniAppDataToUser: (user: TelegramMiniAppUser) => ({
           name: user.username || user.first_name,
           image: user.photo_url,
           email: undefined,

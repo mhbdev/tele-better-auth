@@ -1,4 +1,4 @@
-# better-auth-telegram
+# tele-better-auth
 
 Telegram auth for [Better Auth](https://www.better-auth.com/). Login Widget, Mini Apps, the whole circus -- in one plugin that somehow works on every runtime.
 
@@ -19,7 +19,7 @@ v1.1.0 | 173 tests | ESM + CJS | Web Crypto API | Works where `node:crypto` fear
 ## Quick Start
 
 ```bash
-npm install better-auth-telegram
+npm install tele-better-auth
 ```
 
 Message [@BotFather](https://t.me/botfather), run `/newbot`, pretend you had a plan all along.
@@ -28,7 +28,7 @@ Message [@BotFather](https://t.me/botfather), run `/newbot`, pretend you had a p
 
 ```typescript
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   database: /* your database config */,
@@ -45,7 +45,7 @@ export const auth = betterAuth({
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
   plugins: [telegramClient()],
@@ -91,7 +91,7 @@ That's it. The rest is in the [Installation Guide](./installation.md) for people
 ## Requirements
 
 - Node.js >= 22 (or Bun, or any runtime with Web Crypto API)
-- `better-auth@^1.5.0`
+- `better-auth@^1.6.11`
 - HTTPS (Telegram insists, and honestly, so should you)
 - Public domain (use ngrok for local dev)
 
@@ -99,14 +99,17 @@ That's it. The rest is in the [Installation Guide](./installation.md) for people
 
 ## Links
 
-- [GitHub](https://github.com/vcode-sh/better-auth-telegram)
-- [npm](https://www.npmjs.com/package/better-auth-telegram)
+- [GitHub](https://github.com/vcode-sh/tele-better-auth)
+- [npm](https://www.npmjs.com/package/tele-better-auth)
 - [Changelog](../CHANGELOG.md)
 - [Better Auth](https://www.better-auth.com/)
 - [Telegram Bot API](https://core.telegram.org/bots/api)
-- [Telegram Login Widget](https://core.telegram.org/widgets/login)
+- [Telegram Login Widget](https://core.telegram.org/bots/telegram-login)
 - [Telegram OIDC](https://core.telegram.org/bots/features#oidc-authorization)
 
 ---
 
 MIT | [Vibe Code](https://vcode.sh) | [@vcode_sh](https://x.com/vcode_sh)
+
+
+

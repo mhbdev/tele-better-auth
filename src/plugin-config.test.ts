@@ -39,6 +39,7 @@ describe("createPluginConfig", () => {
     expect(config.mapTelegramDataToUser).toBeUndefined();
     expect(config.mapMiniAppDataToUser).toBeUndefined();
     expect(config.oidc).toBeUndefined();
+    expect(config.oidcClientId).toBe("123456789");
   });
 
   // ── Feature flags ──────────────────────────────────────────────────
@@ -68,6 +69,15 @@ describe("createPluginConfig", () => {
     });
     expect(config.oidcEnabled).toBe(true);
     expect(config.oidc).toEqual({ enabled: true });
+  });
+
+  it("uses oidc.clientId when explicitly provided", () => {
+    const config = createPluginConfig({
+      ...BASE,
+      oidc: { enabled: true, clientId: "999999999" },
+    });
+
+    expect(config.oidcClientId).toBe("999999999");
   });
 
   // ── Mini App sub-options ───────────────────────────────────────────

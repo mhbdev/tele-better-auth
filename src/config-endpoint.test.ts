@@ -21,6 +21,7 @@ function makeConfig(
     widgetEnabled: true,
     miniAppEnabled: false,
     oidcEnabled: false,
+    oidcClientId: "123456789",
     testMode: false,
     allowUserToLink: true,
     autoCreateUser: true,
@@ -52,6 +53,7 @@ describe("createConfigEndpoint", () => {
       loginWidgetEnabled: true,
       miniAppEnabled: false,
       oidcEnabled: false,
+      oidcClientId: "123456789",
       testMode: false,
     });
   });
@@ -83,6 +85,7 @@ describe("createConfigEndpoint", () => {
       loginWidgetEnabled: true,
       miniAppEnabled: true,
       oidcEnabled: true,
+      oidcClientId: "123456789",
       testMode: true,
     });
   });

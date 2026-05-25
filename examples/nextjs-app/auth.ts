@@ -2,7 +2,7 @@
 // app/lib/auth.ts
 
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   database: {

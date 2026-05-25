@@ -1,5 +1,5 @@
 {
-  "name": "better-auth-telegram",
+  "name": "tele-better-auth",
   "version": "1.5.0",
   "type": "module",
   "description": "Telegram authentication plugin for Better Auth",
@@ -59,14 +59,14 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vcode-sh/better-auth-telegram.git"
+    "url": "https://github.com/vcode-sh/tele-better-auth.git"
   },
   "bugs": {
-    "url": "https://github.com/vcode-sh/better-auth-telegram/issues"
+    "url": "https://github.com/vcode-sh/tele-better-auth/issues"
   },
-  "homepage": "https://github.com/vcode-sh/better-auth-telegram#readme",
+  "homepage": "https://github.com/vcode-sh/tele-better-auth#readme",
   "peerDependencies": {
-    "better-auth": "^1.5.0"
+    "better-auth": "^1.6.11"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -76,7 +76,7 @@
     "@types/node": "^25.3.0",
     "@vitest/coverage-v8": "4.0.18",
     "@vitest/ui": "^4.0.18",
-    "better-auth": "1.5.0",
+    "better-auth": "1.6.11",
     "happy-dom": "20.7.0",
     "lint-staged": "16.2.7",
     "tsup": "8.5.1",

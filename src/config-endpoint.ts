@@ -18,6 +18,7 @@ export function createConfigEndpoint(config: TelegramPluginConfig) {
           loginWidgetEnabled: config.widgetEnabled,
           miniAppEnabled: config.miniAppEnabled,
           oidcEnabled: config.oidcEnabled,
+          oidcClientId: config.oidcClientId,
           testMode: config.testMode,
         })
     ),

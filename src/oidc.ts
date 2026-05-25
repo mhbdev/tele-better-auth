@@ -88,7 +88,7 @@ export function createTelegramOIDCProvider(
   const clientSecret = options.clientSecret || botToken;
   if (!options.clientSecret) {
     console.warn(
-      "[better-auth-telegram] OIDC: no clientSecret provided. Using bot token as fallback.",
+      "[tele-better-auth] OIDC: no clientSecret provided. Using bot token as fallback.",
       "For OIDC to work, configure Web Login in @BotFather (Bot Settings > Web Login)",
       "and pass the Client Secret via oidc.clientSecret."
     );
@@ -153,7 +153,7 @@ export function createTelegramOIDCProvider(
     getUserInfo(token) {
       if (!token.idToken) {
         console.warn(
-          "[better-auth-telegram] OIDC getUserInfo: no id_token in token response.",
+          "[tele-better-auth] OIDC getUserInfo: no id_token in token response.",
           "Token keys:",
           Object.keys(token).filter((k) => k !== "raw"),
           "Raw keys:",
@@ -167,7 +167,7 @@ export function createTelegramOIDCProvider(
         claims = decodeJwt(token.idToken) as TelegramOIDCClaims;
       } catch (e) {
         console.warn(
-          "[better-auth-telegram] OIDC getUserInfo: failed to decode id_token.",
+          "[tele-better-auth] OIDC getUserInfo: failed to decode id_token.",
           e instanceof Error ? e.message : e
         );
         return Promise.resolve(null);
@@ -175,7 +175,7 @@ export function createTelegramOIDCProvider(
 
       if (!claims.sub) {
         console.warn(
-          "[better-auth-telegram] OIDC getUserInfo: id_token has no sub claim.",
+          "[tele-better-auth] OIDC getUserInfo: id_token has no sub claim.",
           "Claims:",
           Object.keys(claims)
         );

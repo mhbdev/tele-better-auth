@@ -1,6 +1,6 @@
 # API Reference
 
-Everything you never knew you needed to know about `better-auth-telegram`, laid out in excruciating detail so you can't blame the docs when your auth breaks at 3am.
+Everything you never knew you needed to know about `tele-better-auth`, laid out in excruciating detail so you can't blame the docs when your auth breaks at 3am.
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ Everything you never knew you needed to know about `better-auth-telegram`, laid 
 The main server plugin function. Returns a `BetterAuthPlugin` object. If you forget `botToken`, it throws immediately -- no silent failures here.
 
 ```typescript
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 const plugin = telegram({
   botToken: "your-bot-token",
@@ -104,7 +104,7 @@ declare module "@better-auth/core" {
 
 ```typescript
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   database: /* your adapter */,
@@ -139,7 +139,7 @@ The browser-side plugin. Manages widget scripts, handles auth flows, and pretend
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 const authClient = createAuthClient({
   baseURL: window.location.origin,
@@ -846,3 +846,4 @@ Before any cryptographic check, the plugin validates that the incoming data has 
 - [Mini Apps Guide](./miniapps.md)
 - [Security Best Practices](./security.md)
 - [Troubleshooting](./troubleshooting.md)
+

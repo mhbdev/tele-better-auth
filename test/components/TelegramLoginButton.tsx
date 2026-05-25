@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { TelegramAuthData } from "tele-better-auth";
 import { authClient } from "@/lib/auth-client";
 
 export function TelegramLoginButton() {
@@ -21,7 +22,7 @@ export function TelegramLoginButton() {
           cornerRadius: 20,
           lang: "en",
         },
-        async (authData) => {
+        async (authData: TelegramAuthData) => {
           setLoading(true);
           setError(null);
 
@@ -56,7 +57,7 @@ export function TelegramLoginButton() {
           }
         }
       )
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error("Failed to initialize Telegram widget:", err);
         setError("Failed to load Telegram login widget");
       });

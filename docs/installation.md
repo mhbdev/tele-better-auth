@@ -5,13 +5,13 @@ You want Telegram auth in your app. Bold choice. Let's get it done without a twe
 ## Prerequisites
 
 - Node.js >= 22
-- A [Better Auth](https://www.better-auth.com/) project (v1.5.0+)
+- A [Better Auth](https://www.better-auth.com/) project (v1.6.11+)
 - A Telegram account (shocking, I know)
 
 ## Install
 
 ```bash
-npm install better-auth-telegram
+npm install tele-better-auth
 ```
 
 Works with pnpm, yarn, bun -- whatever you've pledged allegiance to this month.
@@ -37,7 +37,7 @@ TELEGRAM_BOT_USERNAME="your_bot_username"
 
 ```typescript
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   // ...your database, secret, etc.
@@ -69,7 +69,7 @@ telegram({
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
   plugins: [telegramClient()],
@@ -154,3 +154,5 @@ Free ngrok gives you a new URL every time. Pay for a static domain or just accep
 - [API Reference](./api-reference.md) -- all the endpoints
 - [Configuration](./configuration.md) -- every option explained
 - [Security](./security.md) -- because you should care
+
+

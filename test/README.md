@@ -1,6 +1,6 @@
 # Better Auth + Telegram Test App
 
-Test/playground application for the `better-auth-telegram` plugin. Demonstrates all three authentication flows: Login Widget, Mini App, and OIDC.
+Test/playground application for the `tele-better-auth` plugin. Demonstrates all three authentication flows: Login Widget, Mini App, and OIDC.
 
 ## Quick Start
 
@@ -168,7 +168,7 @@ curl http://localhost:3000/api/auth/telegram/config
 
 ### "origin required" (OIDC)
 
-Make sure you're using `better-auth-telegram` v1.2.1+ which includes the `origin` parameter fix.
+Make sure you're using `tele-better-auth` v1.2.1+ which includes the `origin` parameter fix.
 
 ### "Telegram widget not loading"
 
@@ -202,14 +202,14 @@ echo 'DATABASE_URL="file:./prisma/dev.db"' > .env
 
 - [Next.js](https://nextjs.org/) 16 with Turbopack
 - [Better Auth](https://better-auth.com) with Prisma adapter
-- [better-auth-telegram](https://www.npmjs.com/package/better-auth-telegram) plugin
+- [tele-better-auth](https://www.npmjs.com/package/tele-better-auth) plugin
 - [Prisma](https://www.prisma.io/) with SQLite
 - [Tailwind CSS](https://tailwindcss.com/) v4
 
 ## Links
 
 - [Better Auth Docs](https://better-auth.com)
-- [Telegram Login Widget Docs](https://core.telegram.org/widgets/login)
+- [Telegram Login Widget Docs](https://core.telegram.org/bots/telegram-login)
 - [Telegram Mini Apps Docs](https://core.telegram.org/bots/webapps)
 - [Telegram OIDC Docs](https://core.telegram.org/bots/features#telegram-login-widget-oidc)
 - [Plugin Source Code](..)
@@ -217,3 +217,5 @@ echo 'DATABASE_URL="file:./prisma/dev.db"' > .env
 ## License
 
 MIT
+
+

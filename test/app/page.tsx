@@ -8,9 +8,7 @@ export default function Home() {
           <h1 className="mb-2 font-bold text-4xl text-gray-900">
             Better Auth + Telegram
           </h1>
-          <p className="text-gray-600">
-            Test app for better-auth-telegram plugin
-          </p>
+          <p className="text-gray-600">Test app for tele-better-auth plugin</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <span className="rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700 text-xs">
               Login Widget

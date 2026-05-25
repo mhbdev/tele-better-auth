@@ -1,9 +1,9 @@
 # Better Auth Telegram
 
-[![npm version](https://img.shields.io/npm/v/better-auth-telegram)](https://www.npmjs.com/package/better-auth-telegram)
-[![npm downloads](https://img.shields.io/npm/dm/better-auth-telegram)](https://www.npmjs.com/package/better-auth-telegram)
-[![CI](https://github.com/vcode-sh/better-auth-telegram/actions/workflows/ci.yml/badge.svg)](https://github.com/vcode-sh/better-auth-telegram/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/vcode-sh/better-auth-telegram/branch/main/graph/badge.svg)](https://codecov.io/gh/vcode-sh/better-auth-telegram)
+[![npm version](https://img.shields.io/npm/v/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
+[![npm downloads](https://img.shields.io/npm/dm/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
+[![CI](https://github.com/vcode-sh/tele-better-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/vcode-sh/tele-better-auth/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/vcode-sh/tele-better-auth/branch/main/graph/badge.svg)](https://codecov.io/gh/vcode-sh/tele-better-auth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Telegram authentication plugin for [Better Auth](https://better-auth.com). Login Widget. Mini Apps. OIDC. Link/unlink. HMAC-SHA-256 verification. The whole circus.
@@ -15,12 +15,12 @@ Built on Web Crypto API — works in Node, Bun, Cloudflare Workers, and whatever
 ## Requirements
 
 - Node.js >= 22 (or Bun, or any runtime with Web Crypto API)
-- `better-auth@^1.5.0`
+- `better-auth@^1.6.11`
 
 ## Install
 
 ```bash
-npm install better-auth-telegram
+npm install tele-better-auth
 ```
 
 ## Setup
@@ -35,7 +35,7 @@ For local dev you'll need [ngrok](https://ngrok.com) because Telegram demands HT
 
 ```typescript
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
   plugins: [
@@ -51,7 +51,7 @@ export const auth = betterAuth({
 
 ```typescript
 import { createAuthClient } from "better-auth/client";
-import { telegramClient } from "better-auth-telegram/client";
+import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
   fetchOptions: {
@@ -96,6 +96,42 @@ authClient.initTelegramWidget(
   }
 );
 ```
+
+### Latest Telegram Login API (`telegram-login.js`)
+
+Use Telegram's current login library from `https://core.telegram.org/bots/telegram-login`:
+
+```tsx
+const nonce = crypto.randomUUID();
+
+// 1) Render Telegram's styled button and initialize popup options
+await authClient.renderTelegramLoginButton(
+  "telegram-login-container",
+  {
+    style: ["outlined", "shine"],
+    requestAccess: ["phone", "write"],
+    nonce,
+  },
+  async (result) => {
+    if ("error" in result) return;
+
+    // 2) Exchange id_token with Better Auth social sign-in
+    await authClient.signInWithTelegramOIDCIdToken(result.id_token, {
+      nonce,
+      callbackURL: "/dashboard",
+    });
+  }
+);
+```
+
+Available new client helpers:
+
+- `initTelegramLogin(options, onAuth?)`
+- `openTelegramLogin(onAuth?)`
+- `authWithTelegramLogin(options, onAuth?)`
+- `renderTelegramLoginButton(containerId, options, onAuth?)`
+- `closeTelegramLogin()`
+- `signInWithTelegramOIDCIdToken(idToken, options?)`
 
 ### Link / Unlink
 
@@ -267,7 +303,7 @@ All endpoints are rate-limited. Signin/miniapp: 10 req/60s. Link/unlink: 5 req/6
 All endpoints throw `APIError` via `APIError.from()`. The plugin exposes `$ERROR_CODES` — each code is a `RawError` object with `code` and `message` properties:
 
 ```typescript
-import { telegram } from "better-auth-telegram";
+import { telegram } from "tele-better-auth";
 
 const plugin = telegram({ botToken: "...", botUsername: "..." });
 
@@ -328,7 +364,7 @@ See [`examples/nextjs-app/`](./examples/nextjs-app) for a Next.js implementation
 
 ### To v1.1.0 (from v1.0.0)
 
-- **Peer dep bumped to `better-auth@^1.5.0`** — upgrade better-auth first, then update the plugin. The `$ERROR_CODES` type changed from `Record<string, string>` to `Record<string, RawError>` and this release follows suit.
+- **Peer dep bumped to `better-auth@^1.6.11`** — upgrade better-auth first, then update the plugin. The `$ERROR_CODES` type changed from `Record<string, string>` to `Record<string, RawError>` and this release follows suit.
 
 ### To v1.0.0 (from v0.4.0)
 
@@ -345,10 +381,10 @@ Full changelog in [CHANGELOG.md](./CHANGELOG.md).
 ## Links
 
 - [Better Auth](https://better-auth.com)
-- [Telegram Login Widget](https://core.telegram.org/widgets/login)
+- [Telegram Login Widget](https://core.telegram.org/bots/telegram-login)
 - [Telegram Mini Apps](https://core.telegram.org/bots/webapps)
 - [Telegram OIDC](https://core.telegram.org/bots/features#oidc-authorization)
-- [GitHub](https://github.com/vcode-sh/better-auth-telegram)
+- [GitHub](https://github.com/vcode-sh/tele-better-auth)
 - [Changelog](./CHANGELOG.md)
 
 ## License
@@ -356,3 +392,6 @@ Full changelog in [CHANGELOG.md](./CHANGELOG.md).
 MIT — do whatever you want. I'm not your lawyer.
 
 Created by [Vibe Code](https://x.com/vcode_sh).
+
+
+

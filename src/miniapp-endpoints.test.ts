@@ -78,6 +78,7 @@ function makeConfig(
     widgetEnabled: false,
     miniAppEnabled: true,
     oidcEnabled: false,
+    oidcClientId: "123456789",
     testMode: false,
     allowUserToLink: true,
     autoCreateUser: true,
