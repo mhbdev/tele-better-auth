@@ -55,16 +55,16 @@
     "plugin",
     "typescript"
   ],
-  "author": "Vibe Code <hello@vcode.sh> (https://vcode.sh)",
+  "author": "mhbdev",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vcode-sh/tele-better-auth.git"
+    "url": "https://github.com/mhbdev/tele-better-auth.git"
   },
   "bugs": {
-    "url": "https://github.com/vcode-sh/tele-better-auth/issues"
+    "url": "https://github.com/mhbdev/tele-better-auth/issues"
   },
-  "homepage": "https://github.com/vcode-sh/tele-better-auth#readme",
+  "homepage": "https://github.com/mhbdev/tele-better-auth#readme",
   "peerDependencies": {
     "better-auth": "^1.6.11"
   },

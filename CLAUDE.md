@@ -1,13 +1,13 @@
-# better-auth-telegram
+# tele-auth-telegram
 
-Telegram authentication plugin for [Better Auth](https://www.better-auth.com/). Login Widget + Mini App + OIDC auth flows, published as `better-auth-telegram` on npm.
+Telegram authentication plugin for [Better Auth](https://www.better-auth.com/). Login Widget + Mini App + OIDC auth flows, published as `tele-auth-telegram` on npm.
 
 ## Architecture
 
 Two entry points, two export paths:
 
-- **`src/index.ts`** -> `better-auth-telegram` -- Server plugin (`BetterAuthPlugin`)
-- **`src/client.ts`** -> `better-auth-telegram/client` -- Browser client plugin (widget management, Mini App auto-signin)
+- **`src/index.ts`** -> `tele-auth-telegram` -- Server plugin (`BetterAuthPlugin`)
+- **`src/client.ts`** -> `tele-auth-telegram/client` -- Browser client plugin (widget management, Mini App auto-signin)
 
 Supporting modules:
 
@@ -18,14 +18,14 @@ Supporting modules:
 
 ### Server Endpoints
 
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| POST | `/telegram/signin` | None | Authenticate with Login Widget data |
-| POST | `/telegram/link` | Session | Link Telegram to current user |
-| POST | `/telegram/unlink` | Session | Unlink Telegram from current user |
-| GET | `/telegram/config` | None | Returns bot username for widget init |
-| POST | `/telegram/miniapp/signin` | None | Sign in from Mini App (optional) |
-| POST | `/telegram/miniapp/validate` | None | Validate Mini App initData (optional) |
+| Method | Path                         | Auth    | Purpose                               |
+| ------ | ---------------------------- | ------- | ------------------------------------- |
+| POST   | `/telegram/signin`           | None    | Authenticate with Login Widget data   |
+| POST   | `/telegram/link`             | Session | Link Telegram to current user         |
+| POST   | `/telegram/unlink`           | Session | Unlink Telegram from current user     |
+| GET    | `/telegram/config`           | None    | Returns bot username for widget init  |
+| POST   | `/telegram/miniapp/signin`   | None    | Sign in from Mini App (optional)      |
+| POST   | `/telegram/miniapp/validate` | None    | Validate Mini App initData (optional) |
 
 OIDC (when `oidc.enabled`) uses Better Auth's built-in social login routes (`POST /sign-in/social` with `provider: "telegram-oidc"`, `GET /callback/telegram-oidc`). The plugin injects a `telegram-oidc` social provider via the `init` hook.
 

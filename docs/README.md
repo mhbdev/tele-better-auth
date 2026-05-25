@@ -99,7 +99,7 @@ That's it. The rest is in the [Installation Guide](./installation.md) for people
 
 ## Links
 
-- [GitHub](https://github.com/vcode-sh/tele-better-auth)
+- [GitHub](https://github.com/mhbdev/tele-better-auth)
 - [npm](https://www.npmjs.com/package/tele-better-auth)
 - [Changelog](../CHANGELOG.md)
 - [Better Auth](https://www.better-auth.com/)
@@ -110,6 +110,3 @@ That's it. The rest is in the [Installation Guide](./installation.md) for people
 ---
 
 MIT | [Vibe Code](https://vcode.sh) | [@vcode_sh](https://x.com/vcode_sh)
-
-
-

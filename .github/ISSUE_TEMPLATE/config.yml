@@ -7,5 +7,5 @@ contact_links:
     url: https://core.telegram.org/bots/api
     about: For when the problem is Telegram's, not mine (it happens more than you'd think)
   - name: Discussions
-    url: https://github.com/vcode-sh/better-auth-telegram/discussions
+    url: https://github.com/mhbdev/tele-auth-telegram/discussions
     about: For questions, shower thoughts, and ideas that aren't quite bugs or features yet

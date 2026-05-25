@@ -2,8 +2,8 @@
 
 [![npm version](https://img.shields.io/npm/v/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
 [![npm downloads](https://img.shields.io/npm/dm/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
-[![CI](https://github.com/vcode-sh/tele-better-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/vcode-sh/tele-better-auth/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/vcode-sh/tele-better-auth/branch/main/graph/badge.svg)](https://codecov.io/gh/vcode-sh/tele-better-auth)
+[![CI](https://github.com/mhbdev/tele-better-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/mhbdev/tele-better-auth/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/mhbdev/tele-better-auth/branch/main/graph/badge.svg)](https://codecov.io/gh/mhbdev/tele-better-auth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Telegram authentication plugin for [Better Auth](https://better-auth.com). Login Widget. Mini Apps. OIDC. Link/unlink. HMAC-SHA-256 verification. The whole circus.
@@ -93,7 +93,7 @@ authClient.initTelegramWidget(
   async (authData) => {
     const result = await authClient.signInWithTelegram(authData);
     if (!result.error) router.push("/dashboard");
-  }
+  },
 );
 ```
 
@@ -120,7 +120,7 @@ await authClient.renderTelegramLoginButton(
       nonce,
       callbackURL: "/dashboard",
     });
-  }
+  },
 );
 ```
 
@@ -159,7 +159,7 @@ await authClient.signInWithTelegram(authData, {
 authClient.initTelegramWidgetRedirect(
   "telegram-login-container",
   "/auth/telegram/callback",
-  { size: "large" }
+  { size: "large" },
 );
 ```
 
@@ -187,12 +187,12 @@ const result = await authClient.autoSignInFromMiniApp();
 
 // or manual
 const result = await authClient.signInWithMiniApp(
-  window.Telegram.WebApp.initData
+  window.Telegram.WebApp.initData,
 );
 
 // or just validate without signing in
 const validation = await authClient.validateMiniApp(
-  window.Telegram.WebApp.initData
+  window.Telegram.WebApp.initData,
 );
 ```
 
@@ -260,39 +260,39 @@ telegram({
 
 ## Configuration
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `botToken` | *required* | From @BotFather |
-| `botUsername` | *required* | Without the @ |
-| `allowUserToLink` | `true` | Let users link Telegram to existing accounts |
-| `autoCreateUser` | `true` | Create user on first sign-in |
-| `maxAuthAge` | `86400` | Auth data TTL in seconds (replay attack prevention) |
-| `testMode` | `false` | Enable Telegram test server mode |
-| `loginWidget` | `true` | Enable Login Widget endpoints and schema fields |
-| `mapTelegramDataToUser` | — | Custom user data mapper |
-| `miniApp.enabled` | `false` | Enable Mini Apps endpoints |
-| `miniApp.validateInitData` | `true` | Verify Mini App initData |
-| `miniApp.allowAutoSignin` | `true` | Allow auto sign-in from Mini Apps |
-| `miniApp.mapMiniAppDataToUser` | — | Custom Mini App user mapper |
-| `oidc.enabled` | `false` | Enable Telegram OIDC flow |
-| `oidc.clientSecret` | — | Client Secret from BotFather Web Login (NOT the bot token) |
-| `oidc.scopes` | `["openid", "profile"]` | OIDC scopes to request |
-| `oidc.requestPhone` | `false` | Request phone number (adds `phone` scope) |
-| `oidc.requestBotAccess` | `false` | Request bot access (adds `telegram:bot_access` scope) |
-| `oidc.mapOIDCProfileToUser` | — | Custom OIDC claims mapper |
+| Option                         | Default                 | Description                                                |
+| ------------------------------ | ----------------------- | ---------------------------------------------------------- |
+| `botToken`                     | _required_              | From @BotFather                                            |
+| `botUsername`                  | _required_              | Without the @                                              |
+| `allowUserToLink`              | `true`                  | Let users link Telegram to existing accounts               |
+| `autoCreateUser`               | `true`                  | Create user on first sign-in                               |
+| `maxAuthAge`                   | `86400`                 | Auth data TTL in seconds (replay attack prevention)        |
+| `testMode`                     | `false`                 | Enable Telegram test server mode                           |
+| `loginWidget`                  | `true`                  | Enable Login Widget endpoints and schema fields            |
+| `mapTelegramDataToUser`        | —                       | Custom user data mapper                                    |
+| `miniApp.enabled`              | `false`                 | Enable Mini Apps endpoints                                 |
+| `miniApp.validateInitData`     | `true`                  | Verify Mini App initData                                   |
+| `miniApp.allowAutoSignin`      | `true`                  | Allow auto sign-in from Mini Apps                          |
+| `miniApp.mapMiniAppDataToUser` | —                       | Custom Mini App user mapper                                |
+| `oidc.enabled`                 | `false`                 | Enable Telegram OIDC flow                                  |
+| `oidc.clientSecret`            | —                       | Client Secret from BotFather Web Login (NOT the bot token) |
+| `oidc.scopes`                  | `["openid", "profile"]` | OIDC scopes to request                                     |
+| `oidc.requestPhone`            | `false`                 | Request phone number (adds `phone` scope)                  |
+| `oidc.requestBotAccess`        | `false`                 | Request bot access (adds `telegram:bot_access` scope)      |
+| `oidc.mapOIDCProfileToUser`    | —                       | Custom OIDC claims mapper                                  |
 
 Full types in [`src/types.ts`](./src/types.ts).
 
 ## Endpoints
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/telegram/signin` | No | Sign in with widget data (when `loginWidget` enabled) |
-| POST | `/telegram/link` | Session | Link Telegram to account (when `loginWidget` enabled) |
-| POST | `/telegram/unlink` | Session | Unlink Telegram (when `loginWidget` enabled) |
-| GET | `/telegram/config` | No | Get bot config (username, testMode, flags) |
-| POST | `/telegram/miniapp/signin` | No | Sign in from Mini App |
-| POST | `/telegram/miniapp/validate` | No | Validate initData |
+| Method | Path                         | Auth    | Description                                           |
+| ------ | ---------------------------- | ------- | ----------------------------------------------------- |
+| POST   | `/telegram/signin`           | No      | Sign in with widget data (when `loginWidget` enabled) |
+| POST   | `/telegram/link`             | Session | Link Telegram to account (when `loginWidget` enabled) |
+| POST   | `/telegram/unlink`           | Session | Unlink Telegram (when `loginWidget` enabled)          |
+| GET    | `/telegram/config`           | No      | Get bot config (username, testMode, flags)            |
+| POST   | `/telegram/miniapp/signin`   | No      | Sign in from Mini App                                 |
+| POST   | `/telegram/miniapp/validate` | No      | Validate initData                                     |
 
 OIDC uses Better Auth's built-in social login routes — `POST /sign-in/social` with `provider: "telegram-oidc"` and `GET /callback/telegram-oidc`. No custom endpoints needed. Delegation at its finest.
 
@@ -384,7 +384,7 @@ Full changelog in [CHANGELOG.md](./CHANGELOG.md).
 - [Telegram Login Widget](https://core.telegram.org/bots/telegram-login)
 - [Telegram Mini Apps](https://core.telegram.org/bots/webapps)
 - [Telegram OIDC](https://core.telegram.org/bots/features#oidc-authorization)
-- [GitHub](https://github.com/vcode-sh/tele-better-auth)
+- [GitHub](https://github.com/mhbdev/tele-better-auth)
 - [Changelog](./CHANGELOG.md)
 
 ## License
@@ -392,6 +392,3 @@ Full changelog in [CHANGELOG.md](./CHANGELOG.md).
 MIT — do whatever you want. I'm not your lawyer.
 
 Created by [Vibe Code](https://x.com/vcode_sh).
-
-
-

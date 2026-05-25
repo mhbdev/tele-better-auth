@@ -54,10 +54,12 @@ export const authClient = createAuthClient({
 
 ```typescript
 // Good: auto-detect the origin
-baseURL: typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL
+baseURL: typeof window !== "undefined"
+  ? window.location.origin
+  : process.env.NEXT_PUBLIC_APP_URL;
 
 // Bad: wrong port. Your app runs on :3000, not :4000.
-baseURL: "http://localhost:4000"
+baseURL: "http://localhost:4000";
 ```
 
 ## Widget Issues
@@ -108,8 +110,10 @@ yourdomain.com    (no https://, just the domain)
 Check your browser console. If something is blocking `telegram.org`, add a CSP exception:
 
 ```html
-<meta http-equiv="Content-Security-Policy"
-      content="script-src 'self' https://telegram.org;">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="script-src 'self' https://telegram.org;"
+/>
 ```
 
 ### "Bot domain invalid"
@@ -170,7 +174,7 @@ HMAC verification failed. The data didn't pass the cryptographic check. This mea
 telegram({
   botToken: process.env.TELEGRAM_BOT_TOKEN!.trim(),
   botUsername: "your_bot",
-})
+});
 ```
 
 If the issue is expired auth data, bump `maxAuthAge`:
@@ -178,7 +182,7 @@ If the issue is expired auth data, bump `maxAuthAge`:
 ```typescript
 telegram({
   maxAuthAge: 86400 * 7, // 7 days, if you're feeling generous
-})
+});
 ```
 
 Or check that your server clock isn't lying to you:
@@ -196,7 +200,7 @@ Either enable it:
 ```typescript
 telegram({
   autoCreateUser: true,
-})
+});
 ```
 
 Or make sure users exist before they attempt Telegram sign-in.
@@ -291,9 +295,10 @@ The sign-in returned a user and session, but subsequent requests act like nobody
 
 ```typescript
 export const authClient = createAuthClient({
-  baseURL: typeof window !== 'undefined'
-    ? window.location.origin
-    : process.env.NEXT_PUBLIC_APP_URL,
+  baseURL:
+    typeof window !== "undefined"
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_APP_URL,
   fetchOptions: { credentials: "include" },
   plugins: [telegramClient()],
 });
@@ -328,23 +333,23 @@ advanced: {
 
 Every error this plugin can throw, mapped to what actually went wrong:
 
-| Error Message | HTTP Status | What It Means |
-|---|---|---|
-| `Telegram plugin: botToken is required` | N/A (thrown at init) | You didn't pass `botToken` to the plugin config. It won't even start. |
-| `Telegram plugin: botUsername is required` | N/A (thrown at init) | You didn't pass `botUsername` to the plugin config. Also won't start. |
-| `Invalid Telegram auth data` | 400 | Request body missing required fields (`id`, `first_name`, `auth_date`, `hash`). |
-| `Invalid Telegram authentication` | 401 | HMAC check failed. Wrong token, expired data, or tampered payload. |
-| `User not found and auto-create is disabled` | 404 | `autoCreateUser` is `false` and no existing account matches. |
-| `Not authenticated` | 401 | No valid session. Probably missing `credentials: "include"`. |
-| `Linking Telegram accounts is disabled` | 403 | `allowUserToLink` is `false`. |
-| `This Telegram account is already linked to another user` | 409 | Telegram account belongs to a different user. |
-| `This Telegram account is already linked to your account` | 409 | Already linked. Nothing to do. |
-| `No Telegram account linked` | 404 | Tried to unlink but nothing was linked. |
-| `initData is required and must be a string` | 400 | Mini App request missing `initData` or wrong type. |
-| `Invalid Mini App initData` | 401 | Mini App HMAC verification failed. |
-| `Invalid Mini App data structure` | 400 | Parsed initData has wrong structure. |
-| `No user data in initData` | 400 | initData has no `user` object. |
-| `User not found and auto-signin is disabled for Mini Apps` | 404 | `autoCreateUser` or `miniApp.allowAutoSignin` is `false`, no existing account. |
+| Error Message                                              | HTTP Status          | What It Means                                                                   |
+| ---------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| `Telegram plugin: botToken is required`                    | N/A (thrown at init) | You didn't pass `botToken` to the plugin config. It won't even start.           |
+| `Telegram plugin: botUsername is required`                 | N/A (thrown at init) | You didn't pass `botUsername` to the plugin config. Also won't start.           |
+| `Invalid Telegram auth data`                               | 400                  | Request body missing required fields (`id`, `first_name`, `auth_date`, `hash`). |
+| `Invalid Telegram authentication`                          | 401                  | HMAC check failed. Wrong token, expired data, or tampered payload.              |
+| `User not found and auto-create is disabled`               | 404                  | `autoCreateUser` is `false` and no existing account matches.                    |
+| `Not authenticated`                                        | 401                  | No valid session. Probably missing `credentials: "include"`.                    |
+| `Linking Telegram accounts is disabled`                    | 403                  | `allowUserToLink` is `false`.                                                   |
+| `This Telegram account is already linked to another user`  | 409                  | Telegram account belongs to a different user.                                   |
+| `This Telegram account is already linked to your account`  | 409                  | Already linked. Nothing to do.                                                  |
+| `No Telegram account linked`                               | 404                  | Tried to unlink but nothing was linked.                                         |
+| `initData is required and must be a string`                | 400                  | Mini App request missing `initData` or wrong type.                              |
+| `Invalid Mini App initData`                                | 401                  | Mini App HMAC verification failed.                                              |
+| `Invalid Mini App data structure`                          | 400                  | Parsed initData has wrong structure.                                            |
+| `No user data in initData`                                 | 400                  | initData has no `user` object.                                                  |
+| `User not found and auto-signin is disabled for Mini Apps` | 404                  | `autoCreateUser` or `miniApp.allowAutoSignin` is `false`, no existing account.  |
 
 ## Getting Help
 
@@ -359,7 +364,7 @@ Plus: your framework, the error message (full text), and steps to reproduce. San
 
 ### Where to Go
 
-- **GitHub Issues:** [github.com/vcode-sh/tele-better-auth/issues](https://github.com/vcode-sh/tele-better-auth/issues)
+- **GitHub Issues:** [github.com/mhbdev/tele-better-auth/issues](https://github.com/mhbdev/tele-better-auth/issues)
 - **Better Auth Discord:** [better-auth.com/discord](https://better-auth.com/discord)
 
 ### Before You Open an Issue
@@ -376,5 +381,3 @@ Plus: your framework, the error message (full text), and steps to reproduce. San
 - [Configuration Guide](./configuration.md)
 - [API Reference](./api-reference.md)
 - [Usage Examples](./usage.md)
-
-

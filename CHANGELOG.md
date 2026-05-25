@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the better-auth-telegram plugin will be documented in this file.
+All notable changes to the tele-auth-telegram plugin will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`loginWidget` option** ([#16](https://github.com/vcode-sh/better-auth-telegram/issues/16)) — `loginWidget?: boolean` (default `true`). Set to `false` to disable Login Widget endpoints (`/telegram/signin`, `/telegram/link`, `/telegram/unlink`) and omit Telegram-specific schema fields (`telegramId`, `telegramUsername`, `telegramPhoneNumber` on user; `telegramId`, `telegramUsername` on account). OIDC-only setups no longer get 5 unused database columns cluttering their schema. Schema fields are still included when `miniApp.enabled` is true, because Mini App flows need them. Zero breaking changes — `undefined` defaults to `true`.
+- **`loginWidget` option** ([#16](https://github.com/mhbdev/tele-auth-telegram/issues/16)) — `loginWidget?: boolean` (default `true`). Set to `false` to disable Login Widget endpoints (`/telegram/signin`, `/telegram/link`, `/telegram/unlink`) and omit Telegram-specific schema fields (`telegramId`, `telegramUsername`, `telegramPhoneNumber` on user; `telegramId`, `telegramUsername` on account). OIDC-only setups no longer get 5 unused database columns cluttering their schema. Schema fields are still included when `miniApp.enabled` is true, because Mini App flows need them. Zero breaking changes — `undefined` defaults to `true`.
 - **`loginWidgetEnabled` in config response** — `GET /telegram/config` now returns `loginWidgetEnabled` boolean alongside existing flags. Client `getTelegramConfig` type updated.
 
 ### Fixed
@@ -25,9 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **OIDC actually works now** ([#11](https://github.com/vcode-sh/better-auth-telegram/issues/11)) — Telegram published [official OIDC docs](https://core.telegram.org/bots/telegram-login) and it turns out: (1) the Client Secret is NOT the bot token — BotFather provides a separate secret via Bot Settings > Web Login, (2) `origin` and `bot_id` are not standard OIDC parameters and were causing Telegram to fall back to Login Widget redirects, (3) Allowed URLs (including the callback URI) must be registered in BotFather's Web Login settings. Removed `origin` and `bot_id` from `additionalParams`. Auth URL is now clean standard OIDC: `client_id`, `redirect_uri`, `response_type=code`, `scope`, `state`, PKCE. Previous versions used the bot token as `client_secret` which Telegram rejected with `invalid_client`.
-- **OIDC cross-domain redirect fixed** ([#12](https://github.com/vcode-sh/better-auth-telegram/issues/12)) — v1.3.0 derived `origin` from the backend `redirectURI` and passed it to Telegram's auth endpoint. When frontend and backend lived on different domains (e.g., `app.example.com` + `api.example.com`), Telegram redirected to `api.example.com/#tgAuthResult=...` — a hash fragment the server never sees. Removing `origin` entirely fixes this: Telegram now uses the standard `redirect_uri` with `?code=` query params. The OAuth 2.0 spec wins again.
-- **Login Widget / Mini App P2002 crash when user exists via OIDC** ([#13](https://github.com/vcode-sh/better-auth-telegram/issues/13)) — `/telegram/signin` and `/telegram/miniapp/signin` only looked for accounts with `providerId=telegram`. If the same Telegram user had previously authenticated via OIDC (`providerId=telegram-oidc`), the endpoint skipped straight to `adapter.create({ model: "user" })` and Prisma threw `P2002: Unique constraint failed on email`. Now both endpoints check for an existing user by `telegramId` before attempting user creation. If found, they link a `telegram` account to the existing user instead of creating a duplicate. Works regardless of `autoCreateUser` — linking an existing user is not creating a new one.
+- **OIDC actually works now** ([#11](https://github.com/mhbdev/tele-auth-telegram/issues/11)) — Telegram published [official OIDC docs](https://core.telegram.org/bots/telegram-login) and it turns out: (1) the Client Secret is NOT the bot token — BotFather provides a separate secret via Bot Settings > Web Login, (2) `origin` and `bot_id` are not standard OIDC parameters and were causing Telegram to fall back to Login Widget redirects, (3) Allowed URLs (including the callback URI) must be registered in BotFather's Web Login settings. Removed `origin` and `bot_id` from `additionalParams`. Auth URL is now clean standard OIDC: `client_id`, `redirect_uri`, `response_type=code`, `scope`, `state`, PKCE. Previous versions used the bot token as `client_secret` which Telegram rejected with `invalid_client`.
+- **OIDC cross-domain redirect fixed** ([#12](https://github.com/mhbdev/tele-auth-telegram/issues/12)) — v1.3.0 derived `origin` from the backend `redirectURI` and passed it to Telegram's auth endpoint. When frontend and backend lived on different domains (e.g., `app.example.com` + `api.example.com`), Telegram redirected to `api.example.com/#tgAuthResult=...` — a hash fragment the server never sees. Removing `origin` entirely fixes this: Telegram now uses the standard `redirect_uri` with `?code=` query params. The OAuth 2.0 spec wins again.
+- **Login Widget / Mini App P2002 crash when user exists via OIDC** ([#13](https://github.com/mhbdev/tele-auth-telegram/issues/13)) — `/telegram/signin` and `/telegram/miniapp/signin` only looked for accounts with `providerId=telegram`. If the same Telegram user had previously authenticated via OIDC (`providerId=telegram-oidc`), the endpoint skipped straight to `adapter.create({ model: "user" })` and Prisma threw `P2002: Unique constraint failed on email`. Now both endpoints check for an existing user by `telegramId` before attempting user creation. If found, they link a `telegram` account to the existing user instead of creating a duplicate. Works regardless of `autoCreateUser` — linking an existing user is not creating a new one.
 
 ### Added
 
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`bot_id` actually ships this time** ([#11](https://github.com/vcode-sh/better-auth-telegram/issues/11)) — The v1.3.2 source had the `bot_id` fix but the npm dist was built before the change landed. The published package sent `additionalParams: { origin }` instead of `additionalParams: { origin, bot_id: botId }`. This release rebuilds from the correct source. Superseded by v1.4.0 which removes `bot_id` entirely per official Telegram OIDC docs.
+- **`bot_id` actually ships this time** ([#11](https://github.com/mhbdev/tele-auth-telegram/issues/11)) — The v1.3.2 source had the `bot_id` fix but the npm dist was built before the change landed. The published package sent `additionalParams: { origin }` instead of `additionalParams: { origin, bot_id: botId }`. This release rebuilds from the correct source. Superseded by v1.4.0 which removes `bot_id` entirely per official Telegram OIDC docs.
 
 ### Added
 
@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **OIDC authorization URL missing `bot_id` parameter** ([#11](https://github.com/vcode-sh/better-auth-telegram/issues/11)) — Telegram's `oauth.telegram.org/auth` endpoint expects `bot_id`, not the standard OAuth2 `client_id`. Better Auth's pipeline sends `client_id` (per spec), and Telegram *appears* to accept it — the user authorizes, gets a code back, everything looks fine. But the scopes don't stick. The token endpoint returns tokens without `id_token`, our `getUserInfo` checks `token.idToken`, finds nothing, returns null, and Better Auth logs "Unable to get user info". The fix: send `bot_id` alongside `client_id` in `additionalParams`. Telegram gets what it wants, the spec stays satisfied, `id_token` comes back in the token response. Everybody wins. Confirmed by [@flxxxxddd](https://github.com/flxxxxddd) who reproduced the bug on the test playground app — so this wasn't a config issue, it was genuinely broken.
+- **OIDC authorization URL missing `bot_id` parameter** ([#11](https://github.com/mhbdev/tele-auth-telegram/issues/11)) — Telegram's `oauth.telegram.org/auth` endpoint expects `bot_id`, not the standard OAuth2 `client_id`. Better Auth's pipeline sends `client_id` (per spec), and Telegram _appears_ to accept it — the user authorizes, gets a code back, everything looks fine. But the scopes don't stick. The token endpoint returns tokens without `id_token`, our `getUserInfo` checks `token.idToken`, finds nothing, returns null, and Better Auth logs "Unable to get user info". The fix: send `bot_id` alongside `client_id` in `additionalParams`. Telegram gets what it wants, the spec stays satisfied, `id_token` comes back in the token response. Everybody wins. Confirmed by [@flxxxxddd](https://github.com/flxxxxddd) who reproduced the bug on the test playground app — so this wasn't a config issue, it was genuinely broken.
 
 ### Added
 
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **OIDC "Unable to get user info" error** ([#11](https://github.com/vcode-sh/better-auth-telegram/issues/11)) — two bugs squashed in one commit. First: `getUserInfo` was silently returning `null` on malformed JWT tokens instead of catching the decode error. Better Auth's callback handler interprets `null` as "this provider is broken" and logs the terrifying `Unable to get user info` message that made [@flxxxxddd](https://github.com/flxxxxddd) file a comment. Now it catches `decodeJwt` failures gracefully. Second: Telegram OIDC doesn't provide an email claim (because Telegram), but Better Auth's callback flow *requires* one or it rejects with `email_not_found`. Now generates a placeholder email (`{telegramId}@telegram.oidc`) so the flow completes. Users can override via `mapOIDCProfileToUser` if they have a real email. The `sub` claim is also validated — no more phantom users from empty JWTs.
+- **OIDC "Unable to get user info" error** ([#11](https://github.com/mhbdev/tele-auth-telegram/issues/11)) — two bugs squashed in one commit. First: `getUserInfo` was silently returning `null` on malformed JWT tokens instead of catching the decode error. Better Auth's callback handler interprets `null` as "this provider is broken" and logs the terrifying `Unable to get user info` message that made [@flxxxxddd](https://github.com/flxxxxddd) file a comment. Now it catches `decodeJwt` failures gracefully. Second: Telegram OIDC doesn't provide an email claim (because Telegram), but Better Auth's callback flow _requires_ one or it rejects with `email_not_found`. Now generates a placeholder email (`{telegramId}@telegram.oidc`) so the flow completes. Users can override via `mapOIDCProfileToUser` if they have a real email. The `sub` claim is also validated — no more phantom users from empty JWTs.
 - **OIDC "origin required" error** — Telegram's `oauth.telegram.org/auth` endpoint requires an `origin` parameter matching the redirect URI's origin. We weren't sending it. Now extracted from `redirectURI` and passed via `additionalParams`. The redirect actually redirects now. Revolutionary.
 
 ### Added
@@ -112,14 +112,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Error codes migrated to `defineErrorCodes()`** — `ERROR_CODES` now uses `defineErrorCodes()` from `@better-auth/core/utils/error-codes`. Each error code is a proper `RawError` object (`{ code, message }`) instead of a plain string. This satisfies Better Auth 1.5's `$ERROR_CODES` type requirement — the whole reason [#11](https://github.com/vcode-sh/better-auth-telegram/issues/11) exists.
+- **Error codes migrated to `defineErrorCodes()`** — `ERROR_CODES` now uses `defineErrorCodes()` from `@better-auth/core/utils/error-codes`. Each error code is a proper `RawError` object (`{ code, message }`) instead of a plain string. This satisfies Better Auth 1.5's `$ERROR_CODES` type requirement — the whole reason [#11](https://github.com/mhbdev/tele-auth-telegram/issues/11) exists.
 - **All `APIError` throws migrated to `APIError.from()`** — 14 `throw new APIError("STATUS", { message })` calls replaced with `throw APIError.from("STATUS", ERROR_CODES.X)`. Same behaviour, new API. Better Auth 1.5 approves.
 - **Removed `(ctx: any)` on init hook** — the OIDC `init` callback now lets TypeScript infer `AuthContext` from the plugin type instead of pretending everything is `any`.
 - **`@better-auth/core` added to tsup externals** — the `defineErrorCodes` import won't get bundled into your dist. It's resolved at runtime from the better-auth ecosystem, as nature intended.
 
 ### Fixed
 
-- **Type mismatch with `better-auth@1.5.0`** ([#11](https://github.com/vcode-sh/better-auth-telegram/issues/11)) — the plugin's `$ERROR_CODES` now satisfies `Record<string, RawError>` instead of the old `Record<string, string>`. Thanks to [@flxxxxddd](https://github.com/flxxxxddd) and [@RainyPixel](https://github.com/RainyPixel) for reporting and confirming the issue.
+- **Type mismatch with `better-auth@1.5.0`** ([#11](https://github.com/mhbdev/tele-auth-telegram/issues/11)) — the plugin's `$ERROR_CODES` now satisfies `Record<string, RawError>` instead of the old `Record<string, string>`. Thanks to [@flxxxxddd](https://github.com/flxxxxddd) and [@RainyPixel](https://github.com/RainyPixel) for reporting and confirming the issue.
 - **OIDC test mocks updated** — `AuthContext` in Better Auth 1.5 now requires `getPlugin` and `hasPlugin` properties. Test mocks updated accordingly.
 
 ### Upgraded
@@ -195,7 +195,7 @@ None — OIDC is opt-in (`oidc.enabled: false` by default). All existing Login W
 
 ### Changed
 
-- **Ditched `node:crypto` for Web Crypto API** — verification now uses `globalThis.crypto.subtle` instead of Node's `createHmac`/`createHash`. Works in Cloudflare Workers, Vite, Convex, and other runtimes that were previously throwing tantrums about `node:crypto`. Shoutout to [@ic4l4s9c](https://github.com/ic4l4s9c) and [@Mukhammadali](https://github.com/Mukhammadali) for making enough noise about this ([#3](https://github.com/vcode-sh/better-auth-telegram/pull/3)).
+- **Ditched `node:crypto` for Web Crypto API** — verification now uses `globalThis.crypto.subtle` instead of Node's `createHmac`/`createHash`. Works in Cloudflare Workers, Vite, Convex, and other runtimes that were previously throwing tantrums about `node:crypto`. Shoutout to [@ic4l4s9c](https://github.com/ic4l4s9c) and [@Mukhammadali](https://github.com/Mukhammadali) for making enough noise about this ([#3](https://github.com/mhbdev/tele-auth-telegram/pull/3)).
 - **Migrated all errors to `APIError` throws** — 14 error returns replaced with proper `throw new APIError("STATUS", { message })`. Status codes mapped to: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`. Better Auth's error pipeline now handles the drama instead of raw JSON.
 - **Extracted error codes to `src/constants.ts`** — no more magic strings scattered across the codebase like confetti at a failed deployment. All error messages, success messages, and defaults now live in one place.
 - **Types converted from `type` to `interface`** — because `ultracite/core` said so, and who are we to argue with a linter.
@@ -241,7 +241,7 @@ None — OIDC is opt-in (`oidc.enabled: false` by default). All existing Login W
 
 ### Fixed
 
-- **Critical:** Session middleware not declared in link/unlink endpoints ([#2](https://github.com/vcode-sh/better-auth-telegram/issues/2))
+- **Critical:** Session middleware not declared in link/unlink endpoints ([#2](https://github.com/mhbdev/tele-auth-telegram/issues/2))
   - Added `sessionMiddleware` to `linkTelegram` and `unlinkTelegram` endpoints
   - Better Auth requires explicit middleware declaration to populate `ctx.context.session`
   - Without it, session was always null even when cookies were sent correctly
@@ -252,7 +252,7 @@ None — OIDC is opt-in (`oidc.enabled: false` by default). All existing Login W
 
 ### Fixed
 
-- **Critical:** Session cookies not being set after successful authentication ([#1](https://github.com/vcode-sh/better-auth-telegram/pull/1))
+- **Critical:** Session cookies not being set after successful authentication ([#1](https://github.com/mhbdev/tele-auth-telegram/pull/1))
   - Added `setSessionCookie()` calls to both `signInWithTelegram` and `signInWithMiniApp` endpoints
   - Users can now actually stay logged in after authentication (turns out that's important)
   - Implementation follows official better-auth plugin pattern
@@ -368,13 +368,13 @@ telegram({
   miniApp: {
     enabled: true,
     validateInitData: true, // default
-    allowAutoSignin: true,  // default
+    allowAutoSignin: true, // default
     mapMiniAppDataToUser: (user) => ({
       name: user.username || user.first_name,
       // custom mapping...
     }),
   },
-})
+});
 ```
 
 ### Breaking Changes
@@ -385,7 +385,7 @@ None - v0.2.0 is fully backward compatible with v0.1.0
 
 ### Added
 
-- Initial release of better-auth-telegram plugin
+- Initial release of tele-auth-telegram plugin
 - Telegram Login Widget integration for Better Auth
 - HMAC-SHA-256 verification for authentication data
 - Replay attack prevention with `auth_date` validation
@@ -456,23 +456,23 @@ None - v0.2.0 is fully backward compatible with v0.1.0
 
 ### Package Metadata
 
-- Author: Vibe Code <hello@vcode.sh>
-- Repository: https://github.com/vcode-sh/better-auth-telegram
+- Author: mhbdev
+- Repository: https://github.com/mhbdev/tele-auth-telegram
 - License: MIT
 - Keywords: better-auth, telegram, authentication, plugin, typescript
 
-[1.5.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.5.0
-[1.4.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.4.0
-[1.3.3]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.3.3
-[1.3.2]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.3.2
-[1.3.1]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.3.1
-[1.3.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.3.0
-[1.2.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.2.0
-[1.1.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.1.0
-[1.0.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v1.0.0
-[0.4.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v0.4.0
-[0.3.2]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v0.3.2
-[0.3.1]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v0.3.1
-[0.3.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v0.3.0
-[0.2.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v0.2.0
-[0.1.0]: https://github.com/vcode-sh/better-auth-telegram/releases/tag/v0.1.0
+[1.5.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.5.0
+[1.4.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.4.0
+[1.3.3]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.3.3
+[1.3.2]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.3.2
+[1.3.1]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.3.1
+[1.3.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.3.0
+[1.2.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.2.0
+[1.1.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.1.0
+[1.0.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v1.0.0
+[0.4.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v0.4.0
+[0.3.2]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v0.3.2
+[0.3.1]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v0.3.1
+[0.3.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v0.3.0
+[0.2.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v0.2.0
+[0.1.0]: https://github.com/mhbdev/tele-auth-telegram/releases/tag/v0.1.0

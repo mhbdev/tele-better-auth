@@ -5,8 +5,8 @@ You want to help build a Telegram auth plugin. Telegram, the platform where bots
 ## Development Setup
 
 ```bash
-git clone https://github.com/vcode-sh/better-auth-telegram.git
-cd better-auth-telegram
+git clone https://github.com/mhbdev/tele-auth-telegram.git
+cd tele-auth-telegram
 npm install
 ```
 
@@ -79,8 +79,8 @@ I maintain 90%+ coverage. Not because I worship the metric, but because untested
 
 ## Reporting Issues
 
-- **Bugs**: use the [bug report template](https://github.com/vcode-sh/better-auth-telegram/issues/new?template=bug_report.yml)
-- **Features**: use the [feature request template](https://github.com/vcode-sh/better-auth-telegram/issues/new?template=feature_request.yml)
+- **Bugs**: use the [bug report template](https://github.com/mhbdev/tele-auth-telegram/issues/new?template=bug_report.yml)
+- **Features**: use the [feature request template](https://github.com/mhbdev/tele-auth-telegram/issues/new?template=feature_request.yml)
 - **Security**: see [SECURITY.md](SECURITY.md) -- do NOT open a public issue for vulnerabilities unless you enjoy chaos
 
 ## Code of Conduct

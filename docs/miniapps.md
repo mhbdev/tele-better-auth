@@ -8,13 +8,13 @@ Works with `tele-better-auth` v0.4.0+ and `better-auth@^1.6.11`.
 
 Before you commit to a path, know what you're choosing:
 
-| | Login Widget | Mini Apps |
-|---|---|---|
-| **Where it runs** | Your website | Inside Telegram |
-| **User action** | Click & authorize in popup | Automatic (they're already there) |
-| **User data** | Name, photo, username | All that + language, premium status, chat context |
-| **Start params** | Nope | Yes |
-| **Setup effort** | Drop a widget | Register a Mini App with BotFather |
+|                   | Login Widget               | Mini Apps                                         |
+| ----------------- | -------------------------- | ------------------------------------------------- |
+| **Where it runs** | Your website               | Inside Telegram                                   |
+| **User action**   | Click & authorize in popup | Automatic (they're already there)                 |
+| **User data**     | Name, photo, username      | All that + language, premium status, chat context |
+| **Start params**  | Nope                       | Yes                                               |
+| **Setup effort**  | Drop a widget              | Register a Mini App with BotFather                |
 
 If your app lives on the open web, use the Login Widget. If your app lives inside Telegram, you're in the right doc.
 
@@ -89,7 +89,7 @@ telegram({
       image: user.photo_url,
     }),
   },
-})
+});
 ```
 
 ## Client Implementation
@@ -156,7 +156,8 @@ function MiniApp() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    authClient.autoSignInFromMiniApp()
+    authClient
+      .autoSignInFromMiniApp()
       .then((result) => setUser(result.data?.user))
       .catch((err) => setError(err.message));
   }, []);
@@ -182,6 +183,7 @@ Signs in (or creates) a user from Mini App initData. Sets session cookie.
 **Returns:** `{ user, session }`
 
 **Errors:**
+
 - `400` — Missing or malformed initData, no user in payload
 - `401` — Cryptographic verification failed
 - `404` — User not found and auto-creation disabled (`autoCreateUser` or `allowAutoSignin` is `false`)
@@ -196,11 +198,11 @@ Validates initData without creating a session. Useful for checking if the data i
 
 ### Client Methods
 
-| Method | What it does |
-|---|---|
-| `authClient.signInWithMiniApp(initData)` | Sign in with raw initData string |
-| `authClient.validateMiniApp(initData)` | Validate initData, get parsed data back |
-| `authClient.autoSignInFromMiniApp()` | Grab initData from `window.Telegram.WebApp` and sign in automatically |
+| Method                                   | What it does                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------- |
+| `authClient.signInWithMiniApp(initData)` | Sign in with raw initData string                                      |
+| `authClient.validateMiniApp(initData)`   | Validate initData, get parsed data back                               |
+| `authClient.autoSignInFromMiniApp()`     | Grab initData from `window.Telegram.WebApp` and sign in automatically |
 
 ### Types
 
@@ -267,6 +269,4 @@ All of this runs on Web Crypto API (`crypto.subtle`) — no Node-specific deps, 
 - [Telegram Mini Apps Docs](https://core.telegram.org/bots/webapps)
 - [Telegram WebApp API](https://core.telegram.org/bots/webapps#initializing-mini-apps)
 - [Better Auth](https://better-auth.com)
-- [GitHub](https://github.com/vcode-sh/tele-better-auth)
-
-
+- [GitHub](https://github.com/mhbdev/tele-better-auth)
