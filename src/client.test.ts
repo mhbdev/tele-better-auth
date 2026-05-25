@@ -48,6 +48,7 @@ describe("telegramClient", () => {
       expect(actions).toHaveProperty("renderTelegramLoginButton");
       expect(actions).toHaveProperty("closeTelegramLogin");
       expect(actions).toHaveProperty("signInWithTelegramOIDCIdToken");
+      expect(actions).toHaveProperty("linkTelegramOIDC");
     });
 
     it("should have all actions as functions", () => {
@@ -65,6 +66,7 @@ describe("telegramClient", () => {
       expect(typeof actions.renderTelegramLoginButton).toBe("function");
       expect(typeof actions.closeTelegramLogin).toBe("function");
       expect(typeof actions.signInWithTelegramOIDCIdToken).toBe("function");
+      expect(typeof actions.linkTelegramOIDC).toBe("function");
     });
   });
 
@@ -1155,6 +1157,12 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
       expect(actions).toHaveProperty("signInWithTelegramOIDC");
       expect(typeof actions.signInWithTelegramOIDC).toBe("function");
+    });
+
+    it("should include linkTelegramOIDC action", () => {
+      const actions = client.getActions(mockFetch);
+      expect(actions).toHaveProperty("linkTelegramOIDC");
+      expect(typeof actions.linkTelegramOIDC).toBe("function");
     });
 
     it("should include new Telegram Login JS API actions", () => {

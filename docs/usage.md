@@ -173,6 +173,20 @@ export function LinkTelegram() {
 }
 ```
 
+For OIDC linking, use the dedicated helper instead of a raw `linkSocial` call:
+
+```tsx
+const result = await authClient.linkTelegramOIDC({
+  callbackURL: "/settings?tab=connections",
+  errorCallbackURL: "/settings?tab=connections",
+  flow: "popup", // sets disableRedirect + opens popup
+});
+
+if (result.error) {
+  console.error(result.error.message);
+}
+```
+
 ## Unlink Telegram Account
 
 The digital breakup. No widget needed -- just call `unlinkTelegram`.

@@ -243,6 +243,16 @@ export interface TelegramOIDCSignInOptions {
   popup?: TelegramOIDCPopupOptions;
 }
 
+/**
+ * Options for Telegram OIDC account linking.
+ */
+export interface TelegramOIDCLinkOptions extends TelegramOIDCSignInOptions {
+  /**
+   * Optional scopes to request during linking.
+   */
+  scopes?: string[];
+}
+
 interface OAuthRedirectResponse {
   redirect?: boolean;
   url?: string;
@@ -870,6 +880,39 @@ export const telegramClient = () => {
               ...fetchOptions,
             }
           );
+
+          if (usePopup && response?.data?.url) {
+            openOIDCPopup(response.data.url, options?.popup);
+          }
+
+          return response;
+        },
+
+        /**
+         * Link Telegram OIDC to the currently authenticated user.
+         * Uses Better Auth's /link-social endpoint under the hood.
+         *
+         * @param options - Callback URLs and popup/redirect flow options
+         * @param fetchOptions - Optional fetch options
+         */
+        linkTelegramOIDC: async (
+          options?: TelegramOIDCLinkOptions,
+          fetchOptions?: FetchOptions
+        ) => {
+          const flow = options?.flow ?? "redirect";
+          const usePopup = flow === "popup";
+
+          const response = await $fetch<OAuthRedirectResponse>("/link-social", {
+            method: "POST",
+            body: {
+              provider: "telegram-oidc",
+              callbackURL: options?.callbackURL,
+              errorCallbackURL: options?.errorCallbackURL,
+              scopes: options?.scopes,
+              disableRedirect: usePopup ? true : undefined,
+            },
+            ...fetchOptions,
+          });
 
           if (usePopup && response?.data?.url) {
             openOIDCPopup(response.data.url, options?.popup);

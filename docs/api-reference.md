@@ -359,6 +359,36 @@ await authClient.signInWithTelegramOIDC({
 
 ---
 
+#### `linkTelegramOIDC(options?)`
+
+Link Telegram OIDC to the current authenticated user via Better Auth's `POST /link-social`. Supports redirect mode (default) and popup mode.
+
+```typescript
+// redirect mode (default)
+await authClient.linkTelegramOIDC({
+  callbackURL: "/settings?tab=connections",
+});
+
+// popup mode
+await authClient.linkTelegramOIDC({
+  callbackURL: "/settings?tab=connections",
+  errorCallbackURL: "/settings?tab=connections",
+  flow: "popup",
+});
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `options.callbackURL` | `string` | URL to redirect after successful linking |
+| `options.errorCallbackURL` | `string` | URL to redirect if linking fails |
+| `options.flow` | `"redirect" \| "popup"` | Flow mode. Default is `"redirect"` |
+| `options.popup` | `TelegramOIDCPopupOptions` | Popup size/position/name/options when `flow: "popup"` |
+| `options.scopes` | `string[]` | Optional extra scopes during OIDC linking |
+
+**Returns:** Social link response from Better Auth. In popup mode, the OAuth URL is opened in `window.open(...)`.
+
+---
+
 ## Types
 
 Every type this plugin exports, straight from the source. No creative liberties taken.

@@ -132,12 +132,20 @@ Available new client helpers:
 - `renderTelegramLoginButton(containerId, options, onAuth?)`
 - `closeTelegramLogin()`
 - `signInWithTelegramOIDCIdToken(idToken, options?)`
+- `linkTelegramOIDC(options?)`
 
 ### Link / Unlink
 
 ```typescript
 // link (user must be authenticated)
 await authClient.linkTelegram(authData);
+
+// OIDC social linking (redirect default, popup optional)
+await authClient.linkTelegramOIDC({
+  callbackURL: "/settings?tab=connections",
+  errorCallbackURL: "/settings?tab=connections",
+  flow: "popup",
+});
 
 // unlink
 await authClient.unlinkTelegram();
