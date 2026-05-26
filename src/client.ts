@@ -279,6 +279,9 @@ interface TelegramLoginApi {
 }
 
 type WidgetContainer = HTMLElement;
+interface FetchSuccessContext {
+  data?: Record<string, unknown> | null;
+}
 
 function normalizeRequestAccess(
   requestAccess?: TelegramLoginRequestAccess | TelegramLoginRequestAccess[]
@@ -476,6 +479,30 @@ function openOIDCPopup(url: string, popupOptions?: TelegramOIDCPopupOptions) {
 
   // Popup blocked: gracefully fall back to same-tab navigation.
   window.location.assign(url);
+}
+
+function withPopupRedirectSuppressed(
+  fetchOptions: FetchOptions | undefined,
+  usePopup: boolean
+) {
+  if (!usePopup) {
+    return fetchOptions;
+  }
+
+  const onSuccess = fetchOptions?.onSuccess;
+
+  return {
+    ...fetchOptions,
+    onSuccess: async (context: FetchSuccessContext) => {
+      if (context?.data && typeof context.data === "object") {
+        context.data.redirect = false;
+      }
+
+      if (typeof onSuccess === "function") {
+        await onSuccess(context);
+      }
+    },
+  };
 }
 
 /**
@@ -866,6 +893,10 @@ export const telegramClient = () => {
         ) => {
           const flow = options?.flow ?? "redirect";
           const usePopup = flow === "popup";
+          const requestOptions = withPopupRedirectSuppressed(
+            fetchOptions,
+            usePopup
+          );
 
           const response = await $fetch<OAuthRedirectResponse>(
             "/sign-in/social",
@@ -877,7 +908,7 @@ export const telegramClient = () => {
                 errorCallbackURL: options?.errorCallbackURL,
                 disableRedirect: usePopup ? true : undefined,
               },
-              ...fetchOptions,
+              ...requestOptions,
             }
           );
 
@@ -901,6 +932,10 @@ export const telegramClient = () => {
         ) => {
           const flow = options?.flow ?? "redirect";
           const usePopup = flow === "popup";
+          const requestOptions = withPopupRedirectSuppressed(
+            fetchOptions,
+            usePopup
+          );
 
           const response = await $fetch<OAuthRedirectResponse>("/link-social", {
             method: "POST",
@@ -911,7 +946,7 @@ export const telegramClient = () => {
               scopes: options?.scopes,
               disableRedirect: usePopup ? true : undefined,
             },
-            ...fetchOptions,
+            ...requestOptions,
           });
 
           if (usePopup && response?.data?.url) {

@@ -1129,6 +1129,7 @@ describe("Client signInWithTelegramOIDC", () => {
         errorCallbackURL: undefined,
         disableRedirect: true,
       },
+      onSuccess: expect.any(Function),
     });
     expect(openSpy).toHaveBeenCalledWith(
       "https://oauth.telegram.org/auth?client_id=123",
@@ -1279,6 +1280,7 @@ describe("Client signInWithTelegramOIDC", () => {
         scopes: ["openid", "profile"],
         disableRedirect: true,
       },
+      onSuccess: expect.any(Function),
     });
     expect(openSpy).toHaveBeenCalledWith(
       "https://oauth.telegram.org/auth?client_id=123",
@@ -1310,6 +1312,59 @@ describe("Client signInWithTelegramOIDC", () => {
       },
       headers: { "X-Custom": "value" },
     });
+  });
+
+  it("should suppress Better Auth auto-redirect in popup flow", async () => {
+    mockFetch.mockResolvedValueOnce({
+      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
+    });
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.signInWithTelegramOIDC({
+      flow: "popup",
+    });
+
+    const requestOptions = mockFetch.mock.calls[0][1];
+    const context = {
+      data: {
+        url: "https://oauth.telegram.org/auth?client_id=123",
+        redirect: true,
+      },
+    };
+
+    await requestOptions.onSuccess(context);
+    expect(context.data.redirect).toBe(false);
+  });
+
+  it("should preserve caller onSuccess in popup flow", async () => {
+    mockFetch.mockResolvedValueOnce({
+      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
+    });
+    const callerOnSuccess = vi.fn();
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.signInWithTelegramOIDC(
+      { flow: "popup" },
+      { onSuccess: callerOnSuccess }
+    );
+
+    const requestOptions = mockFetch.mock.calls[0][1];
+    const context = {
+      data: {
+        url: "https://oauth.telegram.org/auth?client_id=123",
+        redirect: true,
+      },
+    };
+
+    await requestOptions.onSuccess(context);
+    expect(context.data.redirect).toBe(false);
+    expect(callerOnSuccess).toHaveBeenCalledWith(context);
   });
 });
 
