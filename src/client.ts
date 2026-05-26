@@ -283,6 +283,11 @@ interface FetchSuccessContext {
   data?: Record<string, unknown> | null;
 }
 
+interface OAuthRedirectLikeData extends Record<string, unknown> {
+  redirect?: unknown;
+  url?: unknown;
+}
+
 function normalizeRequestAccess(
   requestAccess?: TelegramLoginRequestAccess | TelegramLoginRequestAccess[]
 ): TelegramLoginRequestAccess[] | undefined {
@@ -483,7 +488,8 @@ function openOIDCPopup(url: string, popupOptions?: TelegramOIDCPopupOptions) {
 
 function withPopupRedirectSuppressed(
   fetchOptions: FetchOptions | undefined,
-  usePopup: boolean
+  usePopup: boolean,
+  onPopupUrl?: (url: string) => void
 ) {
   if (!usePopup) {
     return fetchOptions;
@@ -495,7 +501,19 @@ function withPopupRedirectSuppressed(
     ...fetchOptions,
     onSuccess: async (context: FetchSuccessContext) => {
       if (context?.data && typeof context.data === "object") {
-        context.data.redirect = false;
+        const responseData = context.data as OAuthRedirectLikeData;
+
+        if (
+          typeof responseData.url === "string" &&
+          responseData.url.length > 0
+        ) {
+          onPopupUrl?.(responseData.url);
+          // Some client setups/plugins may navigate on any non-empty `url`.
+          // Clear it after capture so popup mode never hard-redirects the opener.
+          responseData.url = "";
+        }
+
+        responseData.redirect = false;
       }
 
       if (typeof onSuccess === "function") {
@@ -893,9 +911,13 @@ export const telegramClient = () => {
         ) => {
           const flow = options?.flow ?? "redirect";
           const usePopup = flow === "popup";
+          let popupUrlFromHook: string | undefined;
           const requestOptions = withPopupRedirectSuppressed(
             fetchOptions,
-            usePopup
+            usePopup,
+            (url) => {
+              popupUrlFromHook = url;
+            }
           );
 
           const response = await $fetch<OAuthRedirectResponse>(
@@ -912,8 +934,9 @@ export const telegramClient = () => {
             }
           );
 
-          if (usePopup && response?.data?.url) {
-            openOIDCPopup(response.data.url, options?.popup);
+          const popupUrl = response?.data?.url || popupUrlFromHook;
+          if (usePopup && popupUrl) {
+            openOIDCPopup(popupUrl, options?.popup);
           }
 
           return response;
@@ -932,9 +955,13 @@ export const telegramClient = () => {
         ) => {
           const flow = options?.flow ?? "redirect";
           const usePopup = flow === "popup";
+          let popupUrlFromHook: string | undefined;
           const requestOptions = withPopupRedirectSuppressed(
             fetchOptions,
-            usePopup
+            usePopup,
+            (url) => {
+              popupUrlFromHook = url;
+            }
           );
 
           const response = await $fetch<OAuthRedirectResponse>("/link-social", {
@@ -949,8 +976,9 @@ export const telegramClient = () => {
             ...requestOptions,
           });
 
-          if (usePopup && response?.data?.url) {
-            openOIDCPopup(response.data.url, options?.popup);
+          const popupUrl = response?.data?.url || popupUrlFromHook;
+          if (usePopup && popupUrl) {
+            openOIDCPopup(popupUrl, options?.popup);
           }
 
           return response;

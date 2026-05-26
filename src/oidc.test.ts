@@ -1337,6 +1337,7 @@ describe("Client signInWithTelegramOIDC", () => {
 
     await requestOptions.onSuccess(context);
     expect(context.data.redirect).toBe(false);
+    expect(context.data.url).toBe("");
   });
 
   it("should preserve caller onSuccess in popup flow", async () => {
@@ -1365,6 +1366,70 @@ describe("Client signInWithTelegramOIDC", () => {
     await requestOptions.onSuccess(context);
     expect(context.data.redirect).toBe(false);
     expect(callerOnSuccess).toHaveBeenCalledWith(context);
+  });
+
+  it("should suppress Better Auth auto-redirect in link popup flow", async () => {
+    mockFetch.mockResolvedValueOnce({
+      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
+    });
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.linkTelegramOIDC({
+      flow: "popup",
+    });
+
+    const requestOptions = mockFetch.mock.calls[0][1];
+    const context = {
+      data: {
+        url: "https://oauth.telegram.org/auth?client_id=123",
+        redirect: true,
+      },
+    };
+
+    await requestOptions.onSuccess(context);
+    expect(context.data.redirect).toBe(false);
+    expect(context.data.url).toBe("");
+  });
+
+  it("should open popup using URL captured in popup onSuccess hook", async () => {
+    mockFetch.mockImplementationOnce(
+      async (
+        _path: string,
+        requestOptions: {
+          onSuccess: (context: {
+            data: { redirect: boolean; url: string };
+          }) => Promise<void> | void;
+        }
+      ) => {
+        const context = {
+          data: {
+            url: "https://oauth.telegram.org/auth?client_id=123",
+            redirect: true,
+          },
+        };
+
+        await requestOptions.onSuccess(context);
+        return { data: context.data };
+      }
+    );
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    await actions.linkTelegramOIDC({
+      flow: "popup",
+    });
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://oauth.telegram.org/auth?client_id=123",
+      "telegram-oidc-login",
+      expect.stringContaining("popup=yes")
+    );
   });
 });
 
