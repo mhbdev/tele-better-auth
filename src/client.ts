@@ -288,6 +288,11 @@ interface OAuthRedirectLikeData extends Record<string, unknown> {
   url?: unknown;
 }
 
+type CustomFetchImpl = (
+  input: RequestInfo | URL,
+  init?: RequestInit
+) => Promise<Response>;
+
 function normalizeRequestAccess(
   requestAccess?: TelegramLoginRequestAccess | TelegramLoginRequestAccess[]
 ): TelegramLoginRequestAccess[] | undefined {
@@ -495,10 +500,64 @@ function withPopupRedirectSuppressed(
     return fetchOptions;
   }
 
+  const resolveCustomFetchImpl = (): CustomFetchImpl => {
+    if (typeof fetchOptions?.customFetchImpl === "function") {
+      return fetchOptions.customFetchImpl as CustomFetchImpl;
+    }
+
+    return (input, init) => fetch(input, init);
+  };
+
+  const rebuildResponse = (response: Response, body: string) =>
+    new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: new Headers(response.headers),
+    });
+
+  const sanitizePopupResponse = async (response: Response) => {
+    if (!response.ok) {
+      return response;
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.toLowerCase().includes("application/json")) {
+      return response;
+    }
+
+    const text = await response.text();
+    if (text.length === 0) {
+      return rebuildResponse(response, text);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return rebuildResponse(response, text);
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return rebuildResponse(response, text);
+    }
+
+    const responseData = parsed as OAuthRedirectLikeData;
+    if (typeof responseData.url === "string" && responseData.url.length > 0) {
+      onPopupUrl?.(responseData.url);
+      responseData.url = "";
+    }
+    responseData.redirect = false;
+
+    return rebuildResponse(response, JSON.stringify(responseData));
+  };
+
+  const customFetchImpl = resolveCustomFetchImpl();
   const onSuccess = fetchOptions?.onSuccess;
 
   return {
     ...fetchOptions,
+    customFetchImpl: async (input: RequestInfo | URL, init?: RequestInit) =>
+      sanitizePopupResponse(await customFetchImpl(input, init)),
     onSuccess: async (context: FetchSuccessContext) => {
       if (context?.data && typeof context.data === "object") {
         const responseData = context.data as OAuthRedirectLikeData;

@@ -1129,10 +1129,60 @@ describe("Client signInWithTelegramOIDC", () => {
         errorCallbackURL: undefined,
         disableRedirect: true,
       },
+      customFetchImpl: expect.any(Function),
       onSuccess: expect.any(Function),
     });
     expect(openSpy).toHaveBeenCalledWith(
       "https://oauth.telegram.org/auth?client_id=123",
+      "telegram-oidc-login",
+      expect.stringContaining("popup=yes")
+    );
+  });
+
+  it("should sanitize popup OAuth response before redirect plugins run", async () => {
+    const popupUrl = "https://oauth.telegram.org/auth?client_id=123";
+    mockFetch.mockImplementationOnce(
+      async (
+        _path: string,
+        requestOptions: {
+          customFetchImpl: (
+            input: RequestInfo | URL,
+            init?: RequestInit
+          ) => Promise<Response>;
+        }
+      ) => {
+        const response = await requestOptions.customFetchImpl(
+          "https://example.com/sign-in/social",
+          { method: "POST" }
+        );
+        return { data: await response.json() };
+      }
+    );
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
+
+    const { telegramClient } = await import("./client");
+    const client = telegramClient();
+    const actions = client.getActions(mockFetch);
+
+    const result = await actions.signInWithTelegramOIDC(
+      { flow: "popup" },
+      {
+        customFetchImpl: async () =>
+          new Response(JSON.stringify({ url: popupUrl, redirect: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      }
+    );
+
+    expect(result).toEqual({
+      data: {
+        url: "",
+        redirect: false,
+      },
+    });
+    expect(openSpy).toHaveBeenCalledWith(
+      popupUrl,
       "telegram-oidc-login",
       expect.stringContaining("popup=yes")
     );
@@ -1280,6 +1330,7 @@ describe("Client signInWithTelegramOIDC", () => {
         scopes: ["openid", "profile"],
         disableRedirect: true,
       },
+      customFetchImpl: expect.any(Function),
       onSuccess: expect.any(Function),
     });
     expect(openSpy).toHaveBeenCalledWith(
