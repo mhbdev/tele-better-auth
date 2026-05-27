@@ -1,6 +1,6 @@
 {
   "name": "tele-better-auth",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "type": "module",
   "description": "Telegram authentication plugin for Better Auth",
   "main": "./dist/index.cjs",
