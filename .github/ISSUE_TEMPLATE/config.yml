@@ -2,10 +2,10 @@ blank_issues_enabled: false
 contact_links:
   - name: Better Auth Documentation
     url: https://better-auth.com
-    about: Read the docs before opening an issue. Revolutionary concept, I know.
+    about: Better Auth setup and integration documentation.
   - name: Telegram Bot API Docs
     url: https://core.telegram.org/bots/api
-    about: For when the problem is Telegram's, not mine (it happens more than you'd think)
+    about: Telegram Bot API and platform documentation.
   - name: Discussions
     url: https://github.com/mhbdev/tele-better-auth/discussions
-    about: For questions, shower thoughts, and ideas that aren't quite bugs or features yet
+    about: Questions and ideas about tele-better-auth.
