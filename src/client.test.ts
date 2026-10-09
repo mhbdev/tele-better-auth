@@ -1,11 +1,26 @@
 /**
  * @vitest-environment happy-dom
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { BetterAuthClientPlugin } from "better-auth/client";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  vi,
+} from "vitest";
 import { telegramClient } from "./client";
 import type { TelegramAuthData } from "./types";
 
 describe("telegramClient", () => {
+  it("matches Better Auth's client plugin contract without a cast", () => {
+    expectTypeOf(telegramClient()).toMatchTypeOf<BetterAuthClientPlugin>();
+    expectTypeOf(telegramClient().id).toEqualTypeOf<"telegram">();
+  });
+
   let mockFetch: any;
   let client: ReturnType<typeof telegramClient>;
 

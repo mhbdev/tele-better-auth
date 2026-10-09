@@ -1,18 +1,19 @@
+import type { ClientFetchOption } from "@better-auth/core";
 import type { BetterAuthClientPlugin } from "better-auth/client";
 import type { telegram } from "./index";
 import type { TelegramAuthData, TelegramOIDCClaims } from "./types";
 
 type TelegramPlugin = typeof telegram;
+type ClientGetActions = NonNullable<BetterAuthClientPlugin["getActions"]>;
+type ClientFetch = Parameters<ClientGetActions>[0];
+type ClientStore = Parameters<ClientGetActions>[1];
+type ClientOptions = Parameters<ClientGetActions>[2];
 
 /**
  * Options that can be passed to fetch calls for customization
  * (e.g., custom headers, cache control, credentials)
  */
-export type TelegramFetchOptions = NonNullable<
-  Parameters<
-    Parameters<NonNullable<BetterAuthClientPlugin["getActions"]>>[0]
-  >[1]
->;
+export type TelegramFetchOptions = ClientFetchOption;
 type FetchOptions = TelegramFetchOptions;
 
 export interface TelegramClientOptions {
@@ -514,7 +515,11 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
   return {
     $InferServerPlugin: {} as ReturnType<TelegramPlugin>,
 
-    getActions: ($fetch) => {
+    getActions: (
+      $fetch: ClientFetch,
+      _store?: ClientStore,
+      _options?: ClientOptions
+    ) => {
       const startOIDCFlow = async (
         path: "/sign-in/social" | "/link-social",
         options?: TelegramOIDCLinkOptions,
@@ -1000,6 +1005,14 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
     id: "telegram",
   } satisfies BetterAuthClientPlugin;
 };
+
+/** The complete client plugin type returned by {@link telegramClient}. */
+export type TelegramClientPlugin = ReturnType<typeof telegramClient>;
+
+/** The action surface added to Better Auth by {@link telegramClient}. */
+export type TelegramActions = ReturnType<
+  NonNullable<TelegramClientPlugin["getActions"]>
+>;
 
 // biome-ignore lint/complexity/noRedundantDefaultExport: Retain the existing public default export.
 export default telegramClient;

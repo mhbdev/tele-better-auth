@@ -5,6 +5,13 @@ All notable changes to the tele-better-auth plugin will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-10-09
+
+### Fixed
+
+- Client declarations now use Better Auth's public fetch option type and expose the complete client plugin callback contract, so `telegramClient()` can be passed directly to `createAuthClient()` without an `unknown` cast.
+- Exported `TelegramClientPlugin` and `TelegramActions` for integrations that need explicit types while preserving the stable `telegram` plugin id.
+
 ## [1.7.0] - 2026-10-09
 
 ### Added

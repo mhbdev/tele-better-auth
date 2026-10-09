@@ -1,6 +1,6 @@
 {
   "name": "tele-better-auth",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Telegram authentication plugin for Better Auth",
   "keywords": [
     "better-auth",
@@ -60,12 +60,13 @@
     "dev": "tsdown --watch",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
-    "prepublishOnly": "npm run lint && npm run type-check && npm run build && npm run test:coverage && npm run check:package",
+    "prepublishOnly": "npm run lint && npm run type-check && npm run type-test && npm run build && npm run test:coverage && npm run check:package",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "type-test": "tsc -p type-tests/tsconfig.json --noEmit"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css}": [

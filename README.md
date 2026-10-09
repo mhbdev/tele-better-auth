@@ -83,6 +83,8 @@ await authClient.signInWithTelegramOIDC({ callbackURL: "/dashboard" });
 await authClient.linkTelegramOIDC({ callbackURL: "/settings/accounts" });
 ```
 
+`telegramClient()` is assignable to Better Auth's client plugin type and keeps its action methods inferred. No `as unknown as BetterAuthClientPlugin` cast is required. If an integration needs the plugin or action types explicitly, import `TelegramClientPlugin` or `TelegramActions` from `tele-better-auth/client`; the plugin id is `telegram`, matching the server plugin.
+
 ### Popup mode
 
 Call directly from a button click. The helper reserves one window before the request, sends `disableRedirect: true`, and navigates only that window. It preserves the response URL and caller fetch hooks. A blocked popup rejects with an actionable error and does not navigate the main tab.
