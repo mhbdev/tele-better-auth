@@ -28,8 +28,8 @@ jobs:
         run: node -e "if (process.env.GITHUB_REF_NAME !== 'v' + require('./package.json').version) process.exit(1)"
       - run: npm run lint
       - run: npm run type-check
-      - run: npm run type-test
       - run: npm run build
+      - run: npm run type-test
       - run: npm run test:coverage
       - run: npm run check:package
       - run: npm audit --omit=dev --audit-level=moderate
