@@ -1,45 +1,41 @@
 name: Release
-
 on:
   push:
-    tags:
-      - "v*"
-
+    tags: ["v*"]
 permissions:
-  contents: write
-  id-token: write
-
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   release:
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Node.js 22.x
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22.x
-          registry-url: https://registry.npmjs.org
+          node-version: 24
           cache: npm
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        run: npm run type-check
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
-      - name: Publish to npm
-        run: npm publish --access public
+      - name: Use the current npm CLI for trusted publishing
+        run: npm install -g npm@latest
+      - run: npm ci
+      - name: Verify release tag matches package version
+        run: node -e "if (process.env.GITHUB_REF_NAME !== 'v' + require('./package.json').version) process.exit(1)"
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run build
+      - run: npm run test:coverage
+      - run: npm run check:package
+      - run: npm audit --omit=dev --audit-level=moderate
+      - name: Pack the verified build
+        run: npm pack
+      - name: Publish through npm trusted publishing
+        run: npm publish tele-better-auth-*.tgz --access public --provenance
+      - name: Create GitHub release
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" tele-better-auth-*.tgz --verify-tag --generate-notes

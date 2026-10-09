@@ -16,18 +16,18 @@ function makeConfig(
   overrides: Partial<TelegramPluginConfig> = {}
 ): TelegramPluginConfig {
   return {
-    botToken: "tok:en",
-    botUsername: "my_bot",
-    widgetEnabled: true,
-    miniAppEnabled: false,
-    oidcEnabled: false,
-    oidcClientId: "123456789",
-    testMode: false,
     allowUserToLink: true,
     autoCreateUser: true,
+    botToken: "tok:en",
+    botUsername: "my_bot",
     maxAuthAge: 86400,
-    miniAppValidateInitData: true,
     miniAppAllowAutoSignin: true,
+    miniAppEnabled: false,
+    miniAppValidateInitData: true,
+    oidcClientId: "123456789",
+    oidcEnabled: false,
+    testMode: false,
+    widgetEnabled: true,
     ...overrides,
   };
 }
@@ -52,8 +52,8 @@ describe("createConfigEndpoint", () => {
       botUsername: "my_bot",
       loginWidgetEnabled: true,
       miniAppEnabled: false,
-      oidcEnabled: false,
       oidcClientId: "123456789",
+      oidcEnabled: false,
       testMode: false,
     });
   });
@@ -71,10 +71,10 @@ describe("createConfigEndpoint", () => {
   it("reflects all features enabled", async () => {
     const endpoint = createConfigEndpoint(
       makeConfig({
-        widgetEnabled: true,
         miniAppEnabled: true,
         oidcEnabled: true,
         testMode: true,
+        widgetEnabled: true,
       })
     );
     const ctx = mockCtx();
@@ -84,8 +84,8 @@ describe("createConfigEndpoint", () => {
       botUsername: "my_bot",
       loginWidgetEnabled: true,
       miniAppEnabled: true,
-      oidcEnabled: true,
       oidcClientId: "123456789",
+      oidcEnabled: true,
       testMode: true,
     });
   });
@@ -95,7 +95,8 @@ describe("createConfigEndpoint", () => {
     const ctx = mockCtx();
     await (endpoint.getTelegramConfig as any)(ctx);
 
-    const response = ctx.json.mock.calls[0]![0];
+    const [firstCall] = ctx.json.mock.calls;
+    const [response] = firstCall!;
     expect(response).not.toHaveProperty("botToken");
     expect(JSON.stringify(response)).not.toContain("tok:en");
   });

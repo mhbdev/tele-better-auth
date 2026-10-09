@@ -12,32 +12,56 @@ export function TelegramLinkButton() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let disposed = false;
+    let dispose: (() => void) | undefined;
     authClient
       .initTelegramWidget(
         "telegram-link-container",
         {
-          size: "medium",
-          showUserPhoto: true,
           cornerRadius: 10,
+          showUserPhoto: true,
+          size: "medium",
         },
         async (authData) => {
+          if (disposed) {
+            return;
+          }
           setLoading(true);
           setError(null);
           setSuccess(false);
 
           try {
-            await authClient.linkTelegram(authData);
+            const result = await authClient.linkTelegram(authData);
+            if (result.error) {
+              setError(result.error.message || "Failed to link Telegram");
+              return;
+            }
             setSuccess(true);
           } catch (err: any) {
-            setError(err?.message || "Failed to link Telegram account");
+            setError(
+              err instanceof Error
+                ? err.message
+                : "Failed to link Telegram account"
+            );
           } finally {
             setLoading(false);
           }
         }
       )
+      .then((cleanup) => {
+        if (disposed) {
+          cleanup();
+        } else {
+          dispose = cleanup;
+        }
+      })
       .catch(() => {
         setError("Failed to load Telegram widget");
       });
+    return () => {
+      disposed = true;
+      dispose?.();
+    };
   }, []);
 
   const handleUnlink = async () => {
@@ -45,7 +69,11 @@ export function TelegramLinkButton() {
     setError(null);
 
     try {
-      await authClient.unlinkTelegram();
+      const result = await authClient.unlinkTelegram();
+      if (result.error) {
+        setError(result.error.message || "Failed to unlink Telegram");
+        return;
+      }
       setSuccess(false);
       window.location.reload();
     } catch (err: any) {
@@ -80,7 +108,11 @@ export function TelegramLinkButton() {
         <div className="text-gray-600 text-sm">Processing...</div>
       )}
 
-      {error && <div className="text-red-600 text-sm">{error}</div>}
+      {error && (
+        <div className="text-red-600 text-sm" role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

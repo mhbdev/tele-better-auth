@@ -73,37 +73,37 @@ describe("telegramClient", () => {
   describe("signInWithTelegram", () => {
     it("should call fetch with correct endpoint and method", async () => {
       const authData: TelegramAuthData = {
-        id: 123456789,
+        auth_date: 1234567890,
         first_name: "John",
+        hash: "abc123",
+        id: 123456789,
         last_name: "Doe",
         username: "johndoe",
-        auth_date: 1234567890,
-        hash: "abc123",
       };
 
-      mockFetch.mockResolvedValueOnce({ data: { user: {}, session: {} } });
+      mockFetch.mockResolvedValueOnce({ data: { session: {}, user: {} } });
 
       const actions = client.getActions(mockFetch);
       await actions.signInWithTelegram(authData);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/signin", {
-        method: "POST",
         body: authData,
+        method: "POST",
       });
     });
 
     it("should return response from fetch", async () => {
       const authData: TelegramAuthData = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
       const expectedResponse = {
         data: {
-          user: { id: "user_123", name: "John" },
           session: { id: "session_456" },
+          user: { id: "user_123", name: "John" },
         },
       };
 
@@ -117,10 +117,10 @@ describe("telegramClient", () => {
 
     it("should handle minimal auth data", async () => {
       const minimalAuthData: TelegramAuthData = {
-        id: 123,
-        first_name: "User",
         auth_date: 123456,
+        first_name: "User",
         hash: "hash",
+        id: 123,
       };
 
       mockFetch.mockResolvedValueOnce({ data: {} });
@@ -129,8 +129,8 @@ describe("telegramClient", () => {
       await actions.signInWithTelegram(minimalAuthData);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/signin", {
-        method: "POST",
         body: minimalAuthData,
+        method: "POST",
       });
     });
   });
@@ -138,10 +138,10 @@ describe("telegramClient", () => {
   describe("linkTelegram", () => {
     it("should call fetch with correct endpoint and method", async () => {
       const authData: TelegramAuthData = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
       mockFetch.mockResolvedValueOnce({ data: { success: true } });
@@ -150,20 +150,20 @@ describe("telegramClient", () => {
       await actions.linkTelegram(authData);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/link", {
-        method: "POST",
         body: authData,
+        method: "POST",
       });
     });
 
     it("should return response from fetch", async () => {
       const authData: TelegramAuthData = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
-      const expectedResponse = { data: { success: true, message: "Linked" } };
+      const expectedResponse = { data: { message: "Linked", success: true } };
 
       mockFetch.mockResolvedValueOnce(expectedResponse);
 
@@ -192,7 +192,7 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
       await actions.unlinkTelegram();
 
-      const callArgs = mockFetch.mock.calls[0];
+      const [callArgs] = mockFetch.mock.calls;
       expect(callArgs[1]).not.toHaveProperty("body");
     });
 
@@ -304,10 +304,10 @@ describe("telegramClient", () => {
       await actions.initTelegramWidget(
         "telegram-login",
         {
-          size: "medium",
-          showUserPhoto: false,
           cornerRadius: 10,
           lang: "en",
+          showUserPhoto: false,
+          size: "medium",
         },
         async () => {}
       );
@@ -369,7 +369,7 @@ describe("telegramClient", () => {
       const script = container.querySelector("script");
       const onAuthAttr = script?.getAttribute("data-onauth");
 
-      expect(onAuthAttr).toMatch(/telegramCallback_\d+\(user\)/);
+      expect(onAuthAttr).toMatch(/telegramCallback_[a-f0-9]+\(user\)/);
 
       // Extract callback name
       const callbackName = onAuthAttr?.replace("(user)", "");
@@ -380,10 +380,10 @@ describe("telegramClient", () => {
     it("should call onAuth callback when telegram returns data", async () => {
       const callback = vi.fn();
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
 
       const actions = client.getActions(mockFetch);
@@ -401,13 +401,13 @@ describe("telegramClient", () => {
       expect(callback).toHaveBeenCalledWith(authData);
     });
 
-    it("should clean up callback function after execution", async () => {
+    it("should keep callback available for repeated authentication", async () => {
       const callback = vi.fn();
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
 
       const actions = client.getActions(mockFetch);
@@ -422,7 +422,7 @@ describe("telegramClient", () => {
       (window as any)[callbackName!](authData);
 
       // Callback should be cleaned up
-      expect((window as any)[callbackName!]).toBeUndefined();
+      expect((window as any)[callbackName!]).toBeTypeOf("function");
     });
   });
 
@@ -498,11 +498,11 @@ describe("telegramClient", () => {
     it("should respect custom options", async () => {
       const actions = client.getActions(mockFetch);
       await actions.initTelegramWidgetRedirect("telegram-login", "/callback", {
-        size: "small",
-        showUserPhoto: false,
         cornerRadius: 5,
-        requestAccess: true,
         lang: "pl",
+        requestAccess: true,
+        showUserPhoto: false,
+        size: "small",
       });
 
       const container = document.getElementById("telegram-login")!;
@@ -539,10 +539,10 @@ describe("telegramClient", () => {
 
       (window as any).Telegram = {
         Login: {
-          init: vi.fn(),
-          open: vi.fn(),
           auth: vi.fn(),
           close: vi.fn(),
+          init: vi.fn(),
+          open: vi.fn(),
         },
       };
 
@@ -551,8 +551,8 @@ describe("telegramClient", () => {
           botUsername: "test_bot",
           loginWidgetEnabled: true,
           miniAppEnabled: false,
-          oidcEnabled: true,
           oidcClientId: "123456789",
+          oidcEnabled: true,
           testMode: false,
         },
       });
@@ -576,18 +576,18 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
 
       await actions.initTelegramLogin({
-        requestAccess: ["phone", "write"],
         lang: "en",
         nonce: "nonce-1",
+        requestAccess: ["phone", "write"],
       });
 
       const telegramLogin = (window as any).Telegram.Login;
       expect(telegramLogin.init).toHaveBeenCalledWith(
         {
           client_id: 123456789,
-          request_access: ["phone", "write"],
           lang: "en",
           nonce: "nonce-1",
+          request_access: ["phone", "write"],
         },
         undefined
       );
@@ -631,8 +631,8 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
 
       await actions.renderTelegramLoginButton("telegram-login", {
-        text: "Continue with Telegram",
         style: ["outlined", "shine"],
+        text: "Continue with Telegram",
       });
 
       const button = document.querySelector(
@@ -640,7 +640,7 @@ describe("telegramClient", () => {
       ) as HTMLButtonElement | null;
 
       expect(button).toBeTruthy();
-      expect(button?.textContent).toBe("Continue with Telegram");
+      expect(button!.textContent).toBe("Continue with Telegram");
       expect(button?.getAttribute("data-style")).toBe("outlined shine");
 
       const telegramLogin = (window as any).Telegram.Login;
@@ -654,26 +654,26 @@ describe("telegramClient", () => {
       const actions = client.getActions(mockFetch);
 
       await actions.signInWithTelegramOIDCIdToken("jwt-token", {
-        nonce: "nonce-1",
         callbackURL: "/dashboard",
+        nonce: "nonce-1",
       });
 
       expect(mockFetch).toHaveBeenLastCalledWith("/sign-in/social", {
-        method: "POST",
         body: {
-          provider: "telegram-oidc",
           callbackURL: "/dashboard",
-          errorCallbackURL: undefined,
-          newUserCallbackURL: undefined,
           disableRedirect: undefined,
-          requestSignUp: undefined,
+          errorCallbackURL: undefined,
           idToken: {
-            token: "jwt-token",
-            nonce: "nonce-1",
             accessToken: undefined,
+            nonce: "nonce-1",
             refreshToken: undefined,
+            token: "jwt-token",
           },
+          newUserCallbackURL: undefined,
+          provider: "telegram-oidc",
+          requestSignUp: undefined,
         },
+        method: "POST",
       });
     });
   });
@@ -685,10 +685,10 @@ describe("telegramClient", () => {
 
       const actions = client.getActions(mockFetch);
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
 
       await expect(actions.signInWithTelegram(authData)).rejects.toThrow(
@@ -702,10 +702,10 @@ describe("telegramClient", () => {
 
       const actions = client.getActions(mockFetch);
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
 
       await expect(actions.linkTelegram(authData)).rejects.toThrow(
@@ -737,8 +737,8 @@ describe("telegramClient", () => {
       it("should call correct endpoint with initData", async () => {
         const mockResponse = {
           data: {
-            user: { id: "123", name: "Test User" },
             session: { token: "session-token" },
+            user: { id: "123", name: "Test User" },
           },
         };
         mockFetch.mockResolvedValueOnce(mockResponse);
@@ -750,8 +750,8 @@ describe("telegramClient", () => {
         const result = await actions.signInWithMiniApp(initData);
 
         expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/signin", {
-          method: "POST",
           body: { initData },
+          method: "POST",
         });
         expect(result).toEqual(mockResponse);
       });
@@ -773,12 +773,12 @@ describe("telegramClient", () => {
       it("should call validate endpoint with initData", async () => {
         const mockResponse = {
           data: {
-            valid: true,
             data: {
-              user: { id: 123, first_name: "Test" },
               auth_date: 1234567890,
               hash: "abc123",
+              user: { first_name: "Test", id: 123 },
             },
+            valid: true,
           },
         };
         mockFetch.mockResolvedValueOnce(mockResponse);
@@ -790,8 +790,8 @@ describe("telegramClient", () => {
         const result = await actions.validateMiniApp(initData);
 
         expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/validate", {
-          method: "POST",
           body: { initData },
+          method: "POST",
         });
         expect(result).toEqual(mockResponse);
       });
@@ -799,8 +799,8 @@ describe("telegramClient", () => {
       it("should return invalid for bad initData", async () => {
         const mockResponse = {
           data: {
-            valid: false,
             data: null,
+            valid: false,
           },
         };
         mockFetch.mockResolvedValueOnce(mockResponse);
@@ -879,8 +879,8 @@ describe("telegramClient", () => {
 
         const mockResponse = {
           data: {
-            user: { id: "123", name: "Test User" },
             session: { token: "session-token" },
+            user: { id: "123", name: "Test User" },
           },
         };
         mockFetch.mockResolvedValueOnce(mockResponse);
@@ -889,8 +889,8 @@ describe("telegramClient", () => {
         const result = await actions.autoSignInFromMiniApp();
 
         expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/signin", {
-          method: "POST",
           body: { initData: mockInitData },
+          method: "POST",
         });
         expect(result).toEqual(mockResponse);
       });
@@ -974,9 +974,7 @@ describe("telegramClient", () => {
             if (node === element) {
               // Don't actually append, just trigger onerror manually
               setTimeout(() => {
-                if (capturedScript?.onerror) {
-                  capturedScript.onerror(new Event("error"));
-                }
+                capturedScript?.dispatchEvent(new Event("error"));
               }, 0);
               return node;
             }
@@ -1013,9 +1011,7 @@ describe("telegramClient", () => {
             if (node === element) {
               // Trigger onload instead of actually loading
               setTimeout(() => {
-                if ((element as HTMLScriptElement).onload) {
-                  (element as HTMLScriptElement).onload!(new Event("load"));
-                }
+                element.dispatchEvent(new Event("load"));
               }, 0);
               return node;
             }
@@ -1179,10 +1175,10 @@ describe("telegramClient", () => {
   describe("fetchOptions support", () => {
     it("should pass fetchOptions to signInWithTelegram", async () => {
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
       const fetchOpts = { headers: { "X-Custom": "value" } };
       mockFetch.mockResolvedValueOnce({ data: {} });
@@ -1191,18 +1187,18 @@ describe("telegramClient", () => {
       await actions.signInWithTelegram(authData, fetchOpts);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/signin", {
-        method: "POST",
         body: authData,
         headers: { "X-Custom": "value" },
+        method: "POST",
       });
     });
 
     it("should pass fetchOptions to linkTelegram", async () => {
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
       const fetchOpts = { headers: { "X-Custom": "value" } };
       mockFetch.mockResolvedValueOnce({ data: {} });
@@ -1211,9 +1207,9 @@ describe("telegramClient", () => {
       await actions.linkTelegram(authData, fetchOpts);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/link", {
-        method: "POST",
         body: authData,
         headers: { "X-Custom": "value" },
+        method: "POST",
       });
     });
 
@@ -1225,8 +1221,8 @@ describe("telegramClient", () => {
       await actions.unlinkTelegram(fetchOpts);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/unlink", {
-        method: "POST",
         headers: { Authorization: "Bearer token" },
+        method: "POST",
       });
     });
 
@@ -1238,8 +1234,8 @@ describe("telegramClient", () => {
       await actions.getTelegramConfig(fetchOpts);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/config", {
-        method: "GET",
         cache: "no-store",
+        method: "GET",
       });
     });
 
@@ -1251,32 +1247,32 @@ describe("telegramClient", () => {
       await actions.signInWithMiniApp("initData", fetchOpts);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/signin", {
-        method: "POST",
         body: { initData: "initData" },
         headers: { "X-Custom": "value" },
+        method: "POST",
       });
     });
 
     it("should pass fetchOptions to validateMiniApp", async () => {
       const fetchOpts = { headers: { "X-Custom": "value" } };
-      mockFetch.mockResolvedValueOnce({ data: { valid: true, data: null } });
+      mockFetch.mockResolvedValueOnce({ data: { data: null, valid: true } });
 
       const actions = client.getActions(mockFetch);
       await actions.validateMiniApp("initData", fetchOpts);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/validate", {
-        method: "POST",
         body: { initData: "initData" },
         headers: { "X-Custom": "value" },
+        method: "POST",
       });
     });
 
     it("should work without fetchOptions (backward compatible)", async () => {
       const authData: TelegramAuthData = {
-        id: 123,
-        first_name: "Test",
         auth_date: 123456,
+        first_name: "Test",
         hash: "hash",
+        id: 123,
       };
       mockFetch.mockResolvedValueOnce({ data: {} });
 
@@ -1284,8 +1280,8 @@ describe("telegramClient", () => {
       await actions.signInWithTelegram(authData);
 
       expect(mockFetch).toHaveBeenCalledWith("/telegram/signin", {
-        method: "POST",
         body: authData,
+        method: "POST",
       });
     });
   });

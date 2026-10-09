@@ -8,7 +8,21 @@ type TelegramPlugin = typeof telegram;
  * Options that can be passed to fetch calls for customization
  * (e.g., custom headers, cache control, credentials)
  */
-type FetchOptions = Record<string, any>;
+export type TelegramFetchOptions = NonNullable<
+  Parameters<
+    Parameters<NonNullable<BetterAuthClientPlugin["getActions"]>>[0]
+  >[1]
+>;
+type FetchOptions = TelegramFetchOptions;
+
+export interface TelegramClientOptions {
+  /** CSP nonce applied to scripts created by this plugin. */
+  scriptNonce?: string;
+  /** Maximum script-loading time in milliseconds. Default: 15000. */
+  scriptTimeoutMs?: number;
+}
+
+const widgetCleanup = new WeakMap<HTMLElement, () => void>();
 
 /**
  * Legacy Telegram Login Widget script URL
@@ -22,7 +36,7 @@ const TELEGRAM_WIDGET_SCRIPT = "https://telegram.org/js/telegram-widget.js?22";
  */
 const TELEGRAM_LOGIN_SCRIPT = "https://telegram.org/js/telegram-login.js";
 
-type TelegramLoginRequestAccess = "phone" | "write";
+type TelegramLoginRequestAccess = "profile" | "phone" | "write";
 
 const DEFAULT_OIDC_POPUP_HEIGHT = 720;
 const DEFAULT_OIDC_POPUP_NAME = "telegram-oidc-login";
@@ -158,7 +172,7 @@ interface TelegramConfigResponse {
   testMode: boolean;
 }
 
-interface TelegramIdTokenSignInOptions {
+export interface TelegramIdTokenSignInOptions {
   accessToken?: string;
   callbackURL?: string;
   disableRedirect?: boolean;
@@ -279,20 +293,6 @@ interface TelegramLoginApi {
 }
 
 type WidgetContainer = HTMLElement;
-interface FetchSuccessContext {
-  data?: Record<string, unknown> | null;
-}
-
-interface OAuthRedirectLikeData extends Record<string, unknown> {
-  redirect?: unknown;
-  url?: unknown;
-}
-
-type CustomFetchImpl = (
-  input: RequestInfo | URL,
-  init?: RequestInit
-) => Promise<Response>;
-
 function normalizeRequestAccess(
   requestAccess?: TelegramLoginRequestAccess | TelegramLoginRequestAccess[]
 ): TelegramLoginRequestAccess[] | undefined {
@@ -325,45 +325,59 @@ function normalizeButtonStyles(
 function loadScript(
   scriptUrl: string,
   errorMessage: string,
-  isLoaded: () => boolean
+  isLoaded: () => boolean,
+  options: TelegramClientOptions
 ): Promise<void> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return Promise.reject(new Error("Telegram scripts require a browser"));
+  }
+  if (isLoaded()) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
-    if (isLoaded()) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>(
+    const existing = document.querySelector<HTMLScriptElement>(
       `script[src="${scriptUrl}"]`
     );
-
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener(
-        "error",
-        () => reject(new Error(errorMessage)),
-        { once: true }
-      );
-      return;
+    const script = existing ?? document.createElement("script");
+    const cleanup = () => {
+      clearTimeout(timeout);
+      script.removeEventListener("load", onLoad);
+      script.removeEventListener("error", onError);
+    };
+    const onLoad = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      script.remove();
+      reject(new Error(errorMessage));
+    };
+    const timeout = setTimeout(onError, options.scriptTimeoutMs ?? 15000);
+    script.addEventListener("load", onLoad, { once: true });
+    script.addEventListener("error", onError, { once: true });
+    if (!existing) {
+      script.src = scriptUrl;
+      script.async = true;
+      if (options.scriptNonce) {
+        script.nonce = options.scriptNonce;
+      }
+      document.head.appendChild(script);
     }
-
-    const script = document.createElement("script");
-    script.src = scriptUrl;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(errorMessage));
-    document.head.appendChild(script);
   });
 }
 
 /**
  * Helper to load legacy Telegram Widget script.
  */
-function loadTelegramWidgetScript(): Promise<void> {
+function loadTelegramWidgetScript(
+  options: TelegramClientOptions
+): Promise<void> {
   return loadScript(
     TELEGRAM_WIDGET_SCRIPT,
     "Failed to load Telegram widget script",
-    () => typeof (window as any).Telegram?.Login !== "undefined"
+    () => typeof (window as any).Telegram?.Login !== "undefined",
+    options
   );
 }
 
@@ -380,11 +394,14 @@ function isTelegramLoginLibraryLoaded() {
 /**
  * Helper to load new Telegram login library script.
  */
-function loadTelegramLoginScript(): Promise<void> {
+function loadTelegramLoginScript(
+  options: TelegramClientOptions
+): Promise<void> {
   return loadScript(
     TELEGRAM_LOGIN_SCRIPT,
     "Failed to load Telegram login script",
-    isTelegramLoginLibraryLoaded
+    isTelegramLoginLibraryLoaded,
+    options
   );
 }
 
@@ -405,7 +422,7 @@ function buildTelegramLoginInitOptions(
   const numericClientId =
     typeof clientId === "number" ? clientId : Number(clientId);
 
-  if (!Number.isFinite(numericClientId)) {
+  if (!Number.isSafeInteger(numericClientId) || numericClientId <= 0) {
     throw new Error("Telegram clientId must be a valid number");
   }
 
@@ -466,131 +483,77 @@ function buildOIDCPopupFeatures(
     `height=${Math.round(height)}`,
     `left=${Math.round(left)}`,
     `top=${Math.round(top)}`,
-    "noopener=yes",
   ].join(",");
 }
 
-function openOIDCPopup(url: string, popupOptions?: TelegramOIDCPopupOptions) {
+function reserveOIDCPopup(options?: TelegramOIDCPopupOptions): Window {
   if (typeof window === "undefined") {
-    throw new Error("Telegram OIDC popup flow can only be used in browser");
+    throw new Error("Popup authentication requires a browser");
   }
-
-  const popupName = popupOptions?.name ?? DEFAULT_OIDC_POPUP_NAME;
-  const popupWindow = window.open(
-    url,
-    popupName,
-    buildOIDCPopupFeatures(popupOptions)
+  const name = options?.name ?? DEFAULT_OIDC_POPUP_NAME;
+  if (["_self", "_top", "_parent"].includes(name.toLowerCase())) {
+    throw new Error("Popup name must target a separate window");
+  }
+  const popup = window.open(
+    "about:blank",
+    name,
+    buildOIDCPopupFeatures(options)
   );
-
-  if (popupWindow) {
-    popupWindow.focus();
-    return;
+  if (!popup) {
+    throw new Error(
+      "Telegram popup was blocked. Allow popups or use flow: redirect."
+    );
   }
-
-  // Popup blocked: gracefully fall back to same-tab navigation.
-  window.location.assign(url);
-}
-
-function withPopupRedirectSuppressed(
-  fetchOptions: FetchOptions | undefined,
-  usePopup: boolean,
-  onPopupUrl?: (url: string) => void
-) {
-  if (!usePopup) {
-    return fetchOptions;
-  }
-
-  const resolveCustomFetchImpl = (): CustomFetchImpl => {
-    if (typeof fetchOptions?.customFetchImpl === "function") {
-      return fetchOptions.customFetchImpl as CustomFetchImpl;
-    }
-
-    return (input, init) => fetch(input, init);
-  };
-
-  const rebuildResponse = (response: Response, body: string) =>
-    new Response(body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: new Headers(response.headers),
-    });
-
-  const sanitizePopupResponse = async (response: Response) => {
-    if (!response.ok) {
-      return response;
-    }
-
-    const contentType = response.headers.get("content-type");
-    if (!contentType?.toLowerCase().includes("application/json")) {
-      return response;
-    }
-
-    const text = await response.text();
-    if (text.length === 0) {
-      return rebuildResponse(response, text);
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return rebuildResponse(response, text);
-    }
-
-    if (!parsed || typeof parsed !== "object") {
-      return rebuildResponse(response, text);
-    }
-
-    const responseData = parsed as OAuthRedirectLikeData;
-    if (typeof responseData.url === "string" && responseData.url.length > 0) {
-      onPopupUrl?.(responseData.url);
-      responseData.url = "";
-    }
-    responseData.redirect = false;
-
-    return rebuildResponse(response, JSON.stringify(responseData));
-  };
-
-  const customFetchImpl = resolveCustomFetchImpl();
-  const onSuccess = fetchOptions?.onSuccess;
-
-  return {
-    ...fetchOptions,
-    customFetchImpl: async (input: RequestInfo | URL, init?: RequestInit) =>
-      sanitizePopupResponse(await customFetchImpl(input, init)),
-    onSuccess: async (context: FetchSuccessContext) => {
-      if (context?.data && typeof context.data === "object") {
-        const responseData = context.data as OAuthRedirectLikeData;
-
-        if (
-          typeof responseData.url === "string" &&
-          responseData.url.length > 0
-        ) {
-          onPopupUrl?.(responseData.url);
-          // Some client setups/plugins may navigate on any non-empty `url`.
-          // Clear it after capture so popup mode never hard-redirects the opener.
-          responseData.url = "";
-        }
-
-        responseData.redirect = false;
-      }
-
-      if (typeof onSuccess === "function") {
-        await onSuccess(context);
-      }
-    },
-  };
+  return popup;
 }
 
 /**
  * Client plugin for Telegram authentication
  */
-export const telegramClient = () => {
+export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
   return {
-    id: "telegram",
     $InferServerPlugin: {} as ReturnType<TelegramPlugin>,
 
     getActions: ($fetch) => {
+      const startOIDCFlow = async (
+        path: "/sign-in/social" | "/link-social",
+        options?: TelegramOIDCLinkOptions,
+        fetchOptions?: FetchOptions
+      ) => {
+        const usePopup = options?.flow === "popup";
+        // Reserve during the user's click, before the first network request.
+        const popup = usePopup ? reserveOIDCPopup(options?.popup) : undefined;
+        try {
+          const response = await $fetch<OAuthRedirectResponse>(path, {
+            ...fetchOptions,
+            body: {
+              callbackURL: options?.callbackURL,
+              disableRedirect: usePopup,
+              errorCallbackURL: options?.errorCallbackURL,
+              provider: "telegram-oidc",
+              scopes: options?.scopes,
+            },
+            method: "POST",
+          });
+          if (popup) {
+            if (response.error || !response.data?.url) {
+              popup.close();
+            } else {
+              const url = new URL(response.data.url);
+              if (url.origin !== "https://oauth.telegram.org") {
+                throw new Error("Unexpected Telegram authorization URL");
+              }
+              popup.location.href = url.href;
+              popup.focus();
+            }
+          }
+          return response;
+        } catch (error) {
+          popup?.close();
+          throw error;
+        }
+      };
+
       const fetchTelegramConfig = async (fetchOptions?: FetchOptions) => {
         const configResponse = await $fetch<TelegramConfigResponse>(
           "/telegram/config",
@@ -611,61 +574,72 @@ export const telegramClient = () => {
         options: TelegramLoginOptions = {},
         onAuth?: (result: TelegramLoginAuthResult) => void
       ) => {
-        await loadTelegramLoginScript();
-        const config = await fetchTelegramConfig();
-        const clientId = resolveTelegramLoginClientId(config, options);
+        await loadTelegramLoginScript(clientOptions);
+        const clientId =
+          options.clientId ??
+          resolveTelegramLoginClientId(await fetchTelegramConfig(), options);
         const loginApi = getTelegramLoginApi();
         loginApi.init(buildTelegramLoginInitOptions(clientId, options), onAuth);
       };
 
       return {
         /**
-         * Sign in with Telegram
-         * @param authData - Authentication data from Telegram Login Widget
-         * @param fetchOptions - Optional fetch options (e.g., custom headers, cache control)
+         * One-shot login popup call with explicit options (Telegram.Login.auth).
          */
-        signInWithTelegram: async (
-          authData: TelegramAuthData,
-          fetchOptions?: FetchOptions
+        authWithTelegramLogin: async (
+          options: TelegramLoginOptions = {},
+          onAuth?: (result: TelegramLoginAuthResult) => void
         ) => {
-          const response = await $fetch("/telegram/signin", {
-            method: "POST",
-            body: authData,
-            ...fetchOptions,
-          });
-
-          return response;
+          await loadTelegramLoginScript(clientOptions);
+          const clientId =
+            options.clientId ??
+            resolveTelegramLoginClientId(await fetchTelegramConfig(), options);
+          const loginApi = getTelegramLoginApi();
+          loginApi.auth(
+            buildTelegramLoginInitOptions(clientId, options),
+            onAuth
+          );
         },
 
         /**
-         * Link current user account with Telegram
-         * @param authData - Authentication data from Telegram Login Widget
-         * @param fetchOptions - Optional fetch options (e.g., custom headers, cache control)
+         * Auto sign-in from Telegram Mini App
+         * Automatically retrieves initData from Telegram.WebApp and signs in
+         * Only works when running inside a Telegram Mini App
          */
-        linkTelegram: async (
-          authData: TelegramAuthData,
-          fetchOptions?: FetchOptions
-        ) => {
-          const response = await $fetch("/telegram/link", {
+        autoSignInFromMiniApp: async (fetchOptions?: FetchOptions) => {
+          if (typeof window === "undefined") {
+            throw new Error("This method can only be called in browser");
+          }
+
+          const { Telegram } = window as any;
+          if (!Telegram?.WebApp?.initData) {
+            throw new Error(
+              "Not running in Telegram Mini App or initData not available"
+            );
+          }
+
+          const { initData } = Telegram.WebApp;
+          return await $fetch("/telegram/miniapp/signin", {
+            body: { initData },
             method: "POST",
-            body: authData,
             ...fetchOptions,
           });
-
-          return response;
         },
 
         /**
-         * Unlink Telegram account from current user
-         * @param fetchOptions - Optional fetch options (e.g., custom headers, cache control)
+         * Close the Telegram Login popup and remove active message listeners.
          */
-        unlinkTelegram: async (fetchOptions?: FetchOptions) => {
-          const response = await $fetch("/telegram/unlink", {
-            method: "POST",
-            ...fetchOptions,
-          });
+        closeTelegramLogin: async () => {
+          await loadTelegramLoginScript(clientOptions);
+          const loginApi = getTelegramLoginApi();
+          loginApi.close();
+        },
 
-          return response;
+        /** Dispose a legacy widget, its iframe, and its global authentication callback. */
+        destroyTelegramWidget: (containerId: string) => {
+          const container = getContainerOrThrow(containerId);
+          widgetCleanup.get(container)?.();
+          container.replaceChildren();
         },
 
         /**
@@ -685,6 +659,17 @@ export const telegramClient = () => {
         },
 
         /**
+         * Initialize the new Telegram Login JS API (telegram-login.js).
+         * Call this once, then trigger popup with openTelegramLogin().
+         */
+        initTelegramLogin: async (
+          options: TelegramLoginOptions = {},
+          onAuth?: (result: TelegramLoginAuthResult) => void
+        ) => {
+          await initTelegramLoginInternal(options, onAuth);
+        },
+
+        /**
          * Initialize Telegram Login Widget (legacy iframe widget).
          * This function creates the legacy Telegram login button and handles callback flow.
          *
@@ -697,7 +682,7 @@ export const telegramClient = () => {
           options: TelegramWidgetOptions = {},
           onAuth: (authData: TelegramAuthData) => void | Promise<void>
         ) => {
-          await loadTelegramWidgetScript();
+          await loadTelegramWidgetScript(clientOptions);
           const config = await fetchTelegramConfig();
 
           const {
@@ -709,16 +694,19 @@ export const telegramClient = () => {
           } = options;
 
           const container = getContainerOrThrow(containerId);
-          container.innerHTML = "";
+          widgetCleanup.get(container)?.();
+          container.replaceChildren();
 
-          const callbackName = `telegramCallback_${Date.now()}`;
+          const callbackName = `telegramCallback_${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
           (window as any)[callbackName] = (authData: TelegramAuthData) => {
             onAuth(authData);
-            delete (window as any)[callbackName];
           };
 
           const script = document.createElement("script");
           script.src = TELEGRAM_WIDGET_SCRIPT;
+          if (clientOptions.scriptNonce) {
+            script.nonce = clientOptions.scriptNonce;
+          }
           script.async = true;
           script.setAttribute("data-telegram-login", config.botUsername);
           script.setAttribute("data-size", size);
@@ -735,6 +723,15 @@ export const telegramClient = () => {
           }
 
           container.appendChild(script);
+          const cleanup = () => {
+            delete (window as any)[callbackName];
+            if (widgetCleanup.get(container) === cleanup) {
+              container.replaceChildren();
+              widgetCleanup.delete(container);
+            }
+          };
+          widgetCleanup.set(container, cleanup);
+          return cleanup;
         },
 
         /**
@@ -749,7 +746,7 @@ export const telegramClient = () => {
           redirectUrl: string,
           options: TelegramWidgetOptions = {}
         ) => {
-          await loadTelegramWidgetScript();
+          await loadTelegramWidgetScript(clientOptions);
           const config = await fetchTelegramConfig();
 
           const {
@@ -761,10 +758,14 @@ export const telegramClient = () => {
           } = options;
 
           const container = getContainerOrThrow(containerId);
-          container.innerHTML = "";
+          widgetCleanup.get(container)?.();
+          container.replaceChildren();
 
           const script = document.createElement("script");
           script.src = TELEGRAM_WIDGET_SCRIPT;
+          if (clientOptions.scriptNonce) {
+            script.nonce = clientOptions.scriptNonce;
+          }
           script.async = true;
           script.setAttribute("data-telegram-login", config.botUsername);
           script.setAttribute("data-size", size);
@@ -783,16 +784,52 @@ export const telegramClient = () => {
           container.appendChild(script);
         },
 
+        /** Link a verified Mini App identity to the current session. */
+        linkMiniApp: (initData: string, fetchOptions?: FetchOptions) =>
+          $fetch("/telegram/miniapp/link", {
+            ...fetchOptions,
+            body: { initData },
+            method: "POST",
+          }),
+
         /**
-         * Initialize the new Telegram Login JS API (telegram-login.js).
-         * Call this once, then trigger popup with openTelegramLogin().
+         * Link current user account with Telegram
+         * @param authData - Authentication data from Telegram Login Widget
+         * @param fetchOptions - Optional fetch options (e.g., custom headers, cache control)
          */
-        initTelegramLogin: async (
-          options: TelegramLoginOptions = {},
-          onAuth?: (result: TelegramLoginAuthResult) => void
+        linkTelegram: async (
+          authData: TelegramAuthData,
+          fetchOptions?: FetchOptions
         ) => {
-          await initTelegramLoginInternal(options, onAuth);
+          const response = await $fetch("/telegram/link", {
+            body: authData,
+            method: "POST",
+            ...fetchOptions,
+          });
+
+          return response;
         },
+
+        /** Link the authenticated user through Better Auth's social linking policy. */
+        linkTelegramOIDC: (
+          options?: TelegramOIDCLinkOptions,
+          fetchOptions?: FetchOptions
+        ) => startOIDCFlow("/link-social", options, fetchOptions),
+
+        /** Link an ID token obtained from telegram-login.js to the current session. */
+        linkTelegramOIDCIdToken: (
+          idToken: string,
+          options?: TelegramIdTokenSignInOptions,
+          fetchOptions?: FetchOptions
+        ) =>
+          $fetch("/link-social", {
+            ...fetchOptions,
+            body: {
+              idToken: { nonce: options?.nonce, token: idToken },
+              provider: "telegram-oidc",
+            },
+            method: "POST",
+          }),
 
         /**
          * Open the Telegram Login popup with previously initialized options.
@@ -800,26 +837,10 @@ export const telegramClient = () => {
         openTelegramLogin: async (
           onAuth?: (result: TelegramLoginAuthResult) => void
         ) => {
-          await loadTelegramLoginScript();
-          const loginApi = getTelegramLoginApi();
-          loginApi.open(onAuth);
-        },
-
-        /**
-         * One-shot login popup call with explicit options (Telegram.Login.auth).
-         */
-        authWithTelegramLogin: async (
-          options: TelegramLoginOptions = {},
-          onAuth?: (result: TelegramLoginAuthResult) => void
-        ) => {
-          await loadTelegramLoginScript();
-          const config = await fetchTelegramConfig();
-          const clientId = resolveTelegramLoginClientId(config, options);
-          const loginApi = getTelegramLoginApi();
-          loginApi.auth(
-            buildTelegramLoginInitOptions(clientId, options),
-            onAuth
-          );
+          if (!isTelegramLoginLibraryLoaded()) {
+            await loadTelegramLoginScript(clientOptions);
+          }
+          getTelegramLoginApi().open(onAuth);
         },
 
         /**
@@ -832,7 +853,8 @@ export const telegramClient = () => {
           onAuth?: (result: TelegramLoginAuthResult) => void
         ) => {
           const container = getContainerOrThrow(containerId);
-          container.innerHTML = "";
+          widgetCleanup.get(container)?.();
+          container.replaceChildren();
 
           const button = document.createElement("button");
           button.type = "button";
@@ -852,45 +874,10 @@ export const telegramClient = () => {
 
           container.appendChild(button);
 
+          button.disabled = true;
           await initTelegramLoginInternal(options, onAuth);
-        },
-
-        /**
-         * Close the Telegram Login popup and remove active message listeners.
-         */
-        closeTelegramLogin: async () => {
-          await loadTelegramLoginScript();
-          const loginApi = getTelegramLoginApi();
-          loginApi.close();
-        },
-
-        /**
-         * Sign in to Better Auth using an ID token from telegram-login.js callback.
-         * Requires `oidc.enabled: true` and Telegram OIDC provider setup on the server.
-         */
-        signInWithTelegramOIDCIdToken: async (
-          idToken: string,
-          options?: TelegramIdTokenSignInOptions,
-          fetchOptions?: FetchOptions
-        ) => {
-          return await $fetch("/sign-in/social", {
-            method: "POST",
-            body: {
-              provider: "telegram-oidc",
-              callbackURL: options?.callbackURL,
-              errorCallbackURL: options?.errorCallbackURL,
-              newUserCallbackURL: options?.newUserCallbackURL,
-              disableRedirect: options?.disableRedirect,
-              requestSignUp: options?.requestSignUp,
-              idToken: {
-                token: idToken,
-                nonce: options?.nonce,
-                accessToken: options?.accessToken,
-                refreshToken: options?.refreshToken,
-              },
-            },
-            ...fetchOptions,
-          });
+          button.disabled = false;
+          return button;
         },
 
         /**
@@ -902,8 +889,86 @@ export const telegramClient = () => {
           fetchOptions?: FetchOptions
         ) => {
           const response = await $fetch("/telegram/miniapp/signin", {
-            method: "POST",
             body: { initData },
+            method: "POST",
+            ...fetchOptions,
+          });
+
+          return response;
+        },
+        /**
+         * Sign in with Telegram
+         * @param authData - Authentication data from Telegram Login Widget
+         * @param fetchOptions - Optional fetch options (e.g., custom headers, cache control)
+         */
+        signInWithTelegram: async (
+          authData: TelegramAuthData,
+          fetchOptions?: FetchOptions
+        ) => {
+          const response = await $fetch("/telegram/signin", {
+            body: authData,
+            method: "POST",
+            ...fetchOptions,
+          });
+
+          return response;
+        },
+
+        /**
+         * Sign in with Telegram OIDC (OpenID Connect)
+         * Initiates the standard OAuth 2.0 Authorization Code flow with PKCE
+         * via oauth.telegram.org. Requires `oidc.enabled: true` on the server.
+         *
+         * @param options - Callback URLs for redirect after authentication
+         * @param fetchOptions - Optional fetch options
+         */
+        signInWithTelegramOIDC: (
+          options?: TelegramOIDCSignInOptions,
+          fetchOptions?: FetchOptions
+        ) => startOIDCFlow("/sign-in/social", options, fetchOptions),
+
+        /**
+         * Sign in to Better Auth using an ID token from telegram-login.js callback.
+         * Requires `oidc.enabled: true` and Telegram OIDC provider setup on the server.
+         */
+        signInWithTelegramOIDCIdToken: async (
+          idToken: string,
+          options?: TelegramIdTokenSignInOptions,
+          fetchOptions?: FetchOptions
+        ) =>
+          await $fetch("/sign-in/social", {
+            body: {
+              callbackURL: options?.callbackURL,
+              disableRedirect: options?.disableRedirect,
+              errorCallbackURL: options?.errorCallbackURL,
+              idToken: {
+                accessToken: options?.accessToken,
+                nonce: options?.nonce,
+                refreshToken: options?.refreshToken,
+                token: idToken,
+              },
+              newUserCallbackURL: options?.newUserCallbackURL,
+              provider: "telegram-oidc",
+              requestSignUp: options?.requestSignUp,
+            },
+            method: "POST",
+            ...fetchOptions,
+          }),
+
+        /** Remove the shared Widget/Mini App identity, including Mini App-only setups. */
+        unlinkMiniApp: (fetchOptions?: FetchOptions) =>
+          $fetch("/telegram/miniapp/unlink", {
+            ...fetchOptions,
+            method: "POST",
+          }),
+
+        /**
+         * Unlink Telegram account from current user
+         * @param fetchOptions - Optional fetch options (e.g., custom headers, cache control)
+         */
+        unlinkTelegram: async (fetchOptions?: FetchOptions) => {
+          const response = await $fetch("/telegram/unlink", {
+            method: "POST",
             ...fetchOptions,
           });
 
@@ -923,128 +988,18 @@ export const telegramClient = () => {
             data: any;
             valid: boolean;
           }>("/telegram/miniapp/validate", {
-            method: "POST",
             body: { initData },
+            method: "POST",
             ...fetchOptions,
           });
-
-          return response;
-        },
-
-        /**
-         * Auto sign-in from Telegram Mini App
-         * Automatically retrieves initData from Telegram.WebApp and signs in
-         * Only works when running inside a Telegram Mini App
-         */
-        autoSignInFromMiniApp: async (fetchOptions?: FetchOptions) => {
-          if (typeof window === "undefined") {
-            throw new Error("This method can only be called in browser");
-          }
-
-          const Telegram = (window as any).Telegram;
-          if (!Telegram?.WebApp?.initData) {
-            throw new Error(
-              "Not running in Telegram Mini App or initData not available"
-            );
-          }
-
-          const initData = Telegram.WebApp.initData;
-          return await $fetch("/telegram/miniapp/signin", {
-            method: "POST",
-            body: { initData },
-            ...fetchOptions,
-          });
-        },
-
-        /**
-         * Sign in with Telegram OIDC (OpenID Connect)
-         * Initiates the standard OAuth 2.0 Authorization Code flow with PKCE
-         * via oauth.telegram.org. Requires `oidc.enabled: true` on the server.
-         *
-         * @param options - Callback URLs for redirect after authentication
-         * @param fetchOptions - Optional fetch options
-         */
-        signInWithTelegramOIDC: async (
-          options?: TelegramOIDCSignInOptions,
-          fetchOptions?: FetchOptions
-        ) => {
-          const flow = options?.flow ?? "redirect";
-          const usePopup = flow === "popup";
-          let popupUrlFromHook: string | undefined;
-          const requestOptions = withPopupRedirectSuppressed(
-            fetchOptions,
-            usePopup,
-            (url) => {
-              popupUrlFromHook = url;
-            }
-          );
-
-          const response = await $fetch<OAuthRedirectResponse>(
-            "/sign-in/social",
-            {
-              method: "POST",
-              body: {
-                provider: "telegram-oidc",
-                callbackURL: options?.callbackURL,
-                errorCallbackURL: options?.errorCallbackURL,
-                disableRedirect: usePopup ? true : undefined,
-              },
-              ...requestOptions,
-            }
-          );
-
-          const popupUrl = response?.data?.url || popupUrlFromHook;
-          if (usePopup && popupUrl) {
-            openOIDCPopup(popupUrl, options?.popup);
-          }
-
-          return response;
-        },
-
-        /**
-         * Link Telegram OIDC to the currently authenticated user.
-         * Uses Better Auth's /link-social endpoint under the hood.
-         *
-         * @param options - Callback URLs and popup/redirect flow options
-         * @param fetchOptions - Optional fetch options
-         */
-        linkTelegramOIDC: async (
-          options?: TelegramOIDCLinkOptions,
-          fetchOptions?: FetchOptions
-        ) => {
-          const flow = options?.flow ?? "redirect";
-          const usePopup = flow === "popup";
-          let popupUrlFromHook: string | undefined;
-          const requestOptions = withPopupRedirectSuppressed(
-            fetchOptions,
-            usePopup,
-            (url) => {
-              popupUrlFromHook = url;
-            }
-          );
-
-          const response = await $fetch<OAuthRedirectResponse>("/link-social", {
-            method: "POST",
-            body: {
-              provider: "telegram-oidc",
-              callbackURL: options?.callbackURL,
-              errorCallbackURL: options?.errorCallbackURL,
-              scopes: options?.scopes,
-              disableRedirect: usePopup ? true : undefined,
-            },
-            ...requestOptions,
-          });
-
-          const popupUrl = response?.data?.url || popupUrlFromHook;
-          if (usePopup && popupUrl) {
-            openOIDCPopup(popupUrl, options?.popup);
-          }
 
           return response;
         },
       };
     },
+    id: "telegram",
   } satisfies BetterAuthClientPlugin;
 };
 
+// biome-ignore lint/complexity/noRedundantDefaultExport: Retain the existing public default export.
 export default telegramClient;

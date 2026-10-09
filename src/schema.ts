@@ -16,38 +16,38 @@ export function createTelegramSchema(
   }
 
   return {
-    user: {
-      fields: {
-        telegramId: {
-          type: "string",
-          required: false,
-          unique: false,
-          input: false,
-        },
-        telegramPhoneNumber: {
-          type: "string",
-          required: false,
-          unique: false,
-          input: false,
-        },
-        telegramUsername: {
-          type: "string",
-          required: false,
-          unique: false,
-          input: false,
-        },
-      },
-    },
     account: {
       fields: {
         telegramId: {
-          type: "string",
           required: false,
+          type: "string",
           unique: false,
         },
         telegramUsername: {
-          type: "string",
           required: false,
+          type: "string",
+          unique: false,
+        },
+      },
+    },
+    user: {
+      fields: {
+        telegramId: {
+          input: false,
+          required: false,
+          type: "string",
+          unique: false,
+        },
+        telegramPhoneNumber: {
+          input: false,
+          required: false,
+          type: "string",
+          unique: false,
+        },
+        telegramUsername: {
+          input: false,
+          required: false,
+          type: "string",
           unique: false,
         },
       },

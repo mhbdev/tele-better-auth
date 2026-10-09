@@ -65,16 +65,19 @@ describe("createPluginConfig", () => {
   it("oidc.enabled: true enables OIDC", () => {
     const config = createPluginConfig({
       ...BASE,
-      oidc: { enabled: true },
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
     });
     expect(config.oidcEnabled).toBe(true);
-    expect(config.oidc).toEqual({ enabled: true });
+    expect(config.oidc).toEqual({
+      clientSecret: "test-oidc-secret",
+      enabled: true,
+    });
   });
 
   it("uses oidc.clientId when explicitly provided", () => {
     const config = createPluginConfig({
       ...BASE,
-      oidc: { enabled: true, clientId: "999999999" },
+      oidc: { clientId: "999999999", enabled: true },
     });
 
     expect(config.oidcClientId).toBe("999999999");
@@ -87,13 +90,13 @@ describe("createPluginConfig", () => {
     const config = createPluginConfig({
       ...BASE,
       miniApp: {
-        enabled: true,
-        validateInitData: false,
         allowAutoSignin: false,
+        enabled: true,
         mapMiniAppDataToUser: mapper,
+        validateInitData: true,
       },
     });
-    expect(config.miniAppValidateInitData).toBe(false);
+    expect(config.miniAppValidateInitData).toBe(true);
     expect(config.miniAppAllowAutoSignin).toBe(false);
     expect(config.mapMiniAppDataToUser).toBe(mapper);
   });
@@ -129,8 +132,8 @@ describe("createPluginConfig", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     createPluginConfig({
       ...BASE,
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
       testMode: true,
-      oidc: { enabled: true },
     });
     expect(spy).toHaveBeenCalledOnce();
     expect(spy.mock.calls[0]![0]).toContain("testMode is enabled with OIDC");
@@ -146,7 +149,10 @@ describe("createPluginConfig", () => {
 
   it("does NOT warn when oidc is enabled but testMode is false", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    createPluginConfig({ ...BASE, oidc: { enabled: true } });
+    createPluginConfig({
+      ...BASE,
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
+    });
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });

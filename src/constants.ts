@@ -3,22 +3,23 @@ import { defineErrorCodes } from "@better-auth/core/utils/error-codes";
 export const ERROR_CODES = defineErrorCodes({
   BOT_TOKEN_REQUIRED: "Telegram plugin: botToken is required",
   BOT_USERNAME_REQUIRED: "Telegram plugin: botUsername is required",
+  INIT_DATA_REQUIRED: "initData is required and must be a string",
   INVALID_AUTH_DATA: "Invalid Telegram auth data",
   INVALID_AUTHENTICATION: "Invalid Telegram authentication",
-  USER_CREATION_DISABLED: "User not found and auto-create is disabled",
-  NOT_AUTHENTICATED: "Not authenticated",
+  INVALID_MINI_APP_DATA_STRUCTURE: "Invalid Mini App data structure",
+  INVALID_MINI_APP_INIT_DATA: "Invalid Mini App initData",
+  LAST_ACCOUNT: "Cannot unlink your last sign-in method",
   LINKING_DISABLED: "Linking Telegram accounts is disabled",
+  MINI_APP_AUTO_SIGNIN_DISABLED:
+    "User not found and auto-signin is disabled for Mini Apps",
+  NO_USER_IN_INIT_DATA: "No user data in initData",
+  NOT_AUTHENTICATED: "Not authenticated",
+  NOT_LINKED: "No Telegram account linked",
   TELEGRAM_ALREADY_LINKED_OTHER:
     "This Telegram account is already linked to another user",
   TELEGRAM_ALREADY_LINKED_SELF:
     "This Telegram account is already linked to your account",
-  NOT_LINKED: "No Telegram account linked",
-  INIT_DATA_REQUIRED: "initData is required and must be a string",
-  INVALID_MINI_APP_INIT_DATA: "Invalid Mini App initData",
-  INVALID_MINI_APP_DATA_STRUCTURE: "Invalid Mini App data structure",
-  NO_USER_IN_INIT_DATA: "No user data in initData",
-  MINI_APP_AUTO_SIGNIN_DISABLED:
-    "User not found and auto-signin is disabled for Mini Apps",
+  USER_CREATION_DISABLED: "User not found and auto-create is disabled",
 });
 
 export const SUCCESS_MESSAGES = {

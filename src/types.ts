@@ -60,9 +60,12 @@ export interface TelegramOIDCClaims {
   aud: string;
   exp: number;
   iat: number;
+  id?: number;
   iss: string;
   name?: string;
+  nonce?: string;
   phone_number?: string;
+  phone_number_verified?: boolean;
   picture?: string;
   preferred_username?: string;
   sub: string;
@@ -72,6 +75,8 @@ export interface TelegramOIDCClaims {
  * Configuration options for Telegram OIDC authentication
  */
 export interface TelegramOIDCOptions {
+  /** Allowed token signing algorithms. Must match BotFather configuration. */
+  algorithms?: ("RS256" | "ES256" | "EdDSA")[];
   /**
    * Client ID from @BotFather's Web Login settings.
    * If omitted, extracted from the main botToken (first part before colon).
@@ -84,10 +89,13 @@ export interface TelegramOIDCOptions {
    * This is NOT your bot token — BotFather provides a separate secret
    * when you configure Web Login under Bot Settings > Web Login.
    *
-   * If omitted, falls back to the bot token (deprecated behavior that
-   * won't work with Telegram's official OIDC registration).
+   * Required when OIDC is enabled. The bot token is never used as a fallback.
    */
   clientSecret?: string;
+  /** Require explicit signup intent for new OIDC users. */
+  disableImplicitSignUp?: boolean;
+  /** Disable new OIDC users, while allowing existing accounts to sign in. */
+  disableSignUp?: boolean;
 
   /**
    * Enable Telegram OIDC support
@@ -143,13 +151,13 @@ export interface TelegramPluginOptions {
    * Bot token obtained from @BotFather
    * Used for verifying authentication data
    */
-  botToken: string;
+  botToken?: string;
 
   /**
    * Bot username (without @)
    * Used for generating the login widget
    */
-  botUsername: string;
+  botUsername?: string;
 
   /**
    * Enable Login Widget endpoints (signin, link, unlink).
@@ -171,7 +179,7 @@ export interface TelegramPluginOptions {
 
   /**
    * Maximum age of auth_date in seconds
-   * Prevents replay attacks
+   * Bounds replay exposure; accepted payloads are not single-use.
    * @default 86400 (24 hours)
    */
   maxAuthAge?: number;
@@ -187,7 +195,8 @@ export interface TelegramPluginOptions {
     enabled?: boolean;
 
     /**
-     * Validate initData from Mini Apps
+     * Validate initData from Mini Apps. Disabling verification is unsupported.
+     * @deprecated Authentication always verifies initData.
      * @default true
      */
     validateInitData?: boolean;
@@ -217,9 +226,8 @@ export interface TelegramPluginOptions {
   oidc?: TelegramOIDCOptions;
 
   /**
-   * Enable Telegram test server mode.
-   * When enabled, the client widget will use Telegram's test environment.
-   * HMAC verification works identically — only the bot token differs.
+   * Legacy informational flag. Does not change Telegram's SDK host.
+   * Use the appropriate bot token for Telegram's test environment.
    * Note: OIDC (oauth.telegram.org) has no documented test variant;
    * a warning is logged if both testMode and oidc are enabled.
    * @default false

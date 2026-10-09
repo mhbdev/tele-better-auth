@@ -1,409 +1,222 @@
-# Better Auth Telegram
+# tele-better-auth
 
-[![npm version](https://img.shields.io/npm/v/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
-[![npm downloads](https://img.shields.io/npm/dm/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
+Telegram authentication and account linking for [Better Auth](https://www.better-auth.com/), maintained by [mhbdev](https://github.com/mhbdev).
+
+[![npm](https://img.shields.io/npm/v/tele-better-auth)](https://www.npmjs.com/package/tele-better-auth)
 [![CI](https://github.com/mhbdev/tele-better-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/mhbdev/tele-better-auth/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/mhbdev/tele-better-auth/branch/main/graph/badge.svg)](https://codecov.io/gh/mhbdev/tele-better-auth)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Telegram authentication plugin for [Better Auth](https://better-auth.com). Login Widget. Mini Apps. OIDC. Link/unlink. HMAC-SHA-256 verification. The whole circus.
-
-Built on Web Crypto API — works in Node, Bun, Cloudflare Workers, and whatever edge runtime you're pretending to need. No `node:crypto` tantrums.
-
-261 tests. 100% coverage. If it breaks, roast me on [X](https://x.com/vcode_sh). If it works, also roast me. I'm there either way, posting through the pain.
+Use Telegram OIDC for new web integrations, the legacy Login Widget for existing HMAC integrations, or verified Mini App `initData` inside Telegram. Each supports sign-in and explicit account linking. The package includes a framework-independent client, TypeScript declarations, ESM and CommonJS builds, and an installable AI-agent skill.
 
 ## Requirements
 
-- Node.js >= 22 (or Bun, or any runtime with Web Crypto API)
-- `better-auth@^1.6.11`
+- Better Auth **1.7.7 or later in the 1.x release line**.
+- Node.js **22.12+**, or a compatible runtime with Web Crypto and Fetch. Repository tooling uses Node 22.18+, 24.11+, or 26+.
+- A configured Better Auth database and mounted auth handler.
+- Telegram credentials from [BotFather](https://t.me/BotFather). Keep all secrets on the server.
 
-## Install
-
-```bash
-npm install tele-better-auth
+```sh
+npm install better-auth tele-better-auth
 ```
 
-## Setup
+## Choose a flow
 
-### 1. Talk to a bot to create a bot
+| Flow | Server configuration | Sign in | Link an existing account |
+| --- | --- | --- | --- |
+| OIDC code flow | `telegram({ loginWidget: false, oidc: … })` | `signInWithTelegramOIDC()` | `linkTelegramOIDC()` |
+| Telegram Login JS | Same OIDC configuration | `signInWithTelegramOIDCIdToken()` | `linkTelegramOIDCIdToken()` |
+| Generic OAuth | `genericOAuth({ config: [telegramOAuth(…)] })` | `signIn.social()` or the OIDC helper | `linkSocial()` or the OIDC helper |
+| Legacy Login Widget | `telegram({ botToken, botUsername })` | `signInWithTelegram()` | `linkTelegram()` |
+| Mini App | `telegram({ loginWidget: false, botToken, miniApp: { enabled: true } })` | `signInWithMiniApp()` | `linkMiniApp()` |
 
-Message [@BotFather](https://t.me/botfather), send `/newbot`, save the token, then `/setdomain` with your domain.
+Widget and Mini App identities share provider ID `telegram`. OIDC and Generic OAuth use `telegram-oidc`, with the immutable OIDC `sub` as the account subject. Telegram's numeric user `id` and OIDC `sub` are different identifiers; this package does not assume they match or merge accounts by username, phone, or placeholder email. To connect the flows to one application user, sign in to that user first and explicitly link the other method.
 
-For local dev you'll need [ngrok](https://ngrok.com) because Telegram demands HTTPS. Localhost? Never heard of it.
+## OIDC setup
 
-### 2. Server
+In BotFather's Web Login settings, register your application origin and exact callback URL:
 
-```typescript
+```text
+https://app.example.com/api/auth/callback/telegram-oidc
+```
+
+Use the **Web Login client ID and client secret**. The client secret is separate from your bot token. OIDC-only installations do not need a bot token or bot username and add no Telegram database columns.
+
+```ts
+// Server: auth.ts
 import { betterAuth } from "better-auth";
 import { telegram } from "tele-better-auth";
 
 export const auth = betterAuth({
+  // Add your database adapter, baseURL, and secret as usual.
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["telegram-oidc"],
+      disableImplicitLinking: true,
+      allowDifferentEmails: true,
+    },
+  },
   plugins: [
     telegram({
-      botToken: process.env.TELEGRAM_BOT_TOKEN!,
-      botUsername: "your_bot_username", // without @
+      loginWidget: false,
+      oidc: {
+        enabled: true,
+        clientId: process.env.TELEGRAM_OIDC_CLIENT_ID!,
+        clientSecret: process.env.TELEGRAM_OIDC_CLIENT_SECRET!,
+      },
     }),
   ],
 });
 ```
 
-### 3. Client
+Telegram does not supply email. OIDC profiles receive an **unverified placeholder** `{sub}@telegram.oidc`. Better Auth requires a trusted provider to link an unverified-email identity. The settings above allow explicit linking to a user with a different email and disable implicit email-based merging. Review their effect on your other providers. Do not add placeholder-email domains to email-based account trust rules.
 
-```typescript
+```ts
+// Browser: auth-client.ts (React/Vue/Svelte clients work too)
 import { createAuthClient } from "better-auth/client";
 import { telegramClient } from "tele-better-auth/client";
 
 export const authClient = createAuthClient({
-  fetchOptions: {
-    credentials: "include", // required for link/unlink
-  },
   plugins: [telegramClient()],
 });
+
+await authClient.signInWithTelegramOIDC({ callbackURL: "/dashboard" });
+await authClient.linkTelegramOIDC({ callbackURL: "/settings/accounts" });
 ```
 
-### 4. Database
+### Popup mode
 
-The plugin adds `telegramId`, `telegramUsername`, and `telegramPhoneNumber` to the `user` table, and `telegramId` and `telegramUsername` to `account` when Login Widget or Mini App flows are enabled (the default). OIDC-only setups (`loginWidget: false`) skip these fields entirely. If using Prisma:
+Call directly from a button click. The helper reserves one window before the request, sends `disableRedirect: true`, and navigates only that window. It preserves the response URL and caller fetch hooks. A blocked popup rejects with an actionable error and does not navigate the main tab.
 
-```prisma
-model User {
-  // ... existing fields
-  telegramId          String?
-  telegramUsername    String?
-  telegramPhoneNumber String?  // populated via OIDC with phone scope
-}
-
-model Account {
-  // ... existing fields
-  telegramId       String?
-  telegramUsername  String?
-}
-```
-
-Then `npx prisma migrate dev` and pray.
-
-## Usage
-
-### Sign in
-
-```tsx
-authClient.initTelegramWidget(
-  "telegram-login-container",
-  { size: "large", cornerRadius: 20 },
-  async (authData) => {
-    const result = await authClient.signInWithTelegram(authData);
-    if (!result.error) router.push("/dashboard");
-  },
-);
-```
-
-### Latest Telegram Login API (`telegram-login.js`)
-
-Use Telegram's current login library from `https://core.telegram.org/bots/telegram-login`:
-
-```tsx
-const nonce = crypto.randomUUID();
-
-// 1) Render Telegram's styled button and initialize popup options
-await authClient.renderTelegramLoginButton(
-  "telegram-login-container",
-  {
-    style: ["outlined", "shine"],
-    requestAccess: ["phone", "write"],
-    nonce,
-  },
-  async (result) => {
-    if ("error" in result) return;
-
-    // 2) Exchange id_token with Better Auth social sign-in
-    await authClient.signInWithTelegramOIDCIdToken(result.id_token, {
-      nonce,
-      callbackURL: "/dashboard",
+```ts
+button.addEventListener("click", async () => {
+  try {
+    const { error } = await authClient.signInWithTelegramOIDC({
+      flow: "popup",
+      callbackURL: "/auth/telegram-complete",
+      errorCallbackURL: "/auth/telegram-error",
+      popup: { width: 520, height: 720, name: "telegram-login" },
     });
+    if (error) showError(error.message);
+  } catch (error) {
+    showError(error instanceof Error ? error.message : "Could not open Telegram");
+  }
+});
+```
+
+The returned promise completes when authorization **starts**; it does not wait for the user to finish. Supply your own completion page. That page can close itself and notify the opener via `postMessage`. Validate the exact origin and expected message in the opener, then refresh `getSession()` and update your UI. Use an error completion page too. For frontends and backends on separate domains, the completion URL should be on the frontend and allowed by Better Auth's trusted-origin configuration.
+
+For Telegram's `telegram-login.js` library, use `Cross-Origin-Opener-Policy: same-origin-allow-popups` where required; `same-origin` blocks its window communication. Browsers decide whether a requested popup appears as a window or tab. Dimensions and `features` are hints.
+
+### Telegram Login JS and custom buttons
+
+Prepare the library before the click so popup activation keeps the browser's user gesture:
+
+```ts
+await authClient.initTelegramLogin({
+  clientId: "123456789",
+  requestAccess: ["profile"],
+}, async (result) => {
+  if ("error" in result) return showError(result.error);
+  const { error } = await authClient.signInWithTelegramOIDCIdToken(result.id_token);
+  if (error) showError(error.message);
+});
+
+button.addEventListener("click", () => authClient.openTelegramLogin());
+```
+
+Use `linkTelegramOIDCIdToken()` instead for a signed-in user's account settings. The server verifies the token before trusting claims. `nonce` passed with a client-submitted token checks claim equality; it is not by itself a server-issued, single-use replay challenge. Prefer the code flow for server-managed state, PKCE, and nonce binding.
+
+`renderTelegramLoginButton(containerId, options, callback)` returns a native button with accessible text, `aria-label`, and `type="button"`. Set `text`, `ariaLabel`, `className`, `lang`, and styles (`rounded`, `square`, `outlined`, `icon`, `shine`), or render your own button. The library uses one global `Telegram.Login` configuration; initialize one active login configuration per page.
+
+### Generic OAuth alternative
+
+Use this **instead of** enabling the plugin's OIDC provider. Registering both under `telegram-oidc` is ambiguous.
+
+```ts
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { telegramOAuth } from "tele-better-auth";
+
+const plugins = [
+  genericOAuth({
+    config: [telegramOAuth({
+      clientId: process.env.TELEGRAM_OIDC_CLIENT_ID!,
+      clientSecret: process.env.TELEGRAM_OIDC_CLIENT_SECRET!,
+    })],
+  }),
+];
+```
+
+Configure the same linking policy as above. The helper uses Telegram discovery, PKCE, Basic token-endpoint authentication, signed ID-token verification, and a custom profile reader because Telegram has no UserInfo endpoint. Better Auth 1.7 uses the core `/sign-in/social`, `/link-social`, and `/callback/telegram-oidc` routes for Generic OAuth too. Add `telegramClient()` for this package's popup and ID-token helpers; the standard `signIn.social` and `linkSocial` methods also work.
+
+## Legacy Widget
+
+Register the domain with BotFather's legacy Login Widget settings. Enable the plugin with `botToken` and `botUsername`, then regenerate your auth database schema.
+
+```ts
+const dispose = await authClient.initTelegramWidget(
+  "telegram-widget",
+  { size: "large", lang: "en", showUserPhoto: true },
+  async (authData) => {
+    const { error } = await authClient.signInWithTelegram(authData);
+    if (error) showError(error.message);
   },
 );
+// When unmounting the component:
+dispose();
 ```
 
-Available new client helpers:
+For linking, send the widget callback data to `linkTelegram()`. The callback remains available for repeated authentication until disposal. Reinitialization disposes the old callback; `destroyTelegramWidget(containerId)` explicitly removes it. `initTelegramWidgetRedirect()` supports Telegram's legacy `data-auth-url` mode; your redirect handler must verify and submit the received data to the server. A redirect alone does not create a Better Auth session.
 
-- `initTelegramLogin(options, onAuth?)`
-- `openTelegramLogin(onAuth?)`
-- `authWithTelegramLogin(options, onAuth?)`
-- `renderTelegramLoginButton(containerId, options, onAuth?)`
-- `closeTelegramLogin()`
-- `signInWithTelegramOIDCIdToken(idToken, options?)`
-- `linkTelegramOIDC(options?)`
+## Mini Apps
 
-### Link / Unlink
+Enable `miniApp: { enabled: true }` on the server and regenerate the database schema. Use the raw SDK value, never `initDataUnsafe`:
 
-```typescript
-// link (user must be authenticated)
-await authClient.linkTelegram(authData);
-
-// OIDC social linking (redirect default, popup optional)
-await authClient.linkTelegramOIDC({
-  callbackURL: "/settings?tab=connections",
-  errorCallbackURL: "/settings?tab=connections",
-  flow: "popup",
-});
-
-// unlink
-await authClient.unlinkTelegram();
+```ts
+const { error } = await authClient.signInWithMiniApp(window.Telegram.WebApp.initData);
+const linked = await authClient.linkMiniApp(window.Telegram.WebApp.initData);
+const validation = await authClient.validateMiniApp(window.Telegram.WebApp.initData);
 ```
 
-Getting "Not authenticated"? You forgot `credentials: "include"`. Go back to [Client setup](#3-client).
+`autoSignInFromMiniApp()` reads the raw `initData` for you. Mini App authentication and linking always verify HMAC and timestamp, even if an old internal config disables verification. Configuring `miniApp.validateInitData: false` now throws. `miniApp.allowAutoSignin: false` prevents creating new Mini App users; existing linked users can still sign in.
 
-All API-calling client methods accept an optional `fetchOptions` parameter for custom headers, cache control, etc:
+## Configuration and account controls
 
-```typescript
-await authClient.signInWithTelegram(authData, {
-  headers: { "x-custom-header": "value" },
-});
+- `allowUserToLink` defaults to `true`; setting it to `false` blocks Widget, Mini App, and plugin-managed OIDC linking. Better Auth's global `accountLinking.enabled: false` also applies.
+- `autoCreateUser` defaults to `true`; `false` rejects unregistered identities. OIDC also accepts `disableSignUp` and `disableImplicitSignUp`.
+- `maxAuthAge` defaults to 86,400 seconds. Use a shorter interval for your use case. Invalid, expired, and future timestamps are rejected. Signed data can be reused during this interval; HMAC validation alone is not single-use replay protection.
+- `mapTelegramDataToUser`, `miniApp.mapMiniAppDataToUser`, and `oidc.mapOIDCProfileToUser` customize mutable local profile fields. Placeholder emails are unverified, including after custom mapping. OIDC account identity always comes from verified `sub`.
+- OIDC defaults to scopes `openid profile` and algorithm `RS256`. Set `scopes`, `requestPhone`, `requestBotAccess`, or `algorithms: ["ES256"]` to match BotFather. `EdDSA` is supported where the runtime supports Ed25519; Telegram restricts it to `openid`. `ES256K` is not supported by this Web Crypto implementation.
+- `telegramClient({ scriptNonce, scriptTimeoutMs })` supports a CSP nonce and bounded script loading. Failed loads are removed for retry. Every network helper accepts typed fetch options for headers, credentials, cancellation, and hooks.
+
+Unlink Widget/Mini App accounts with `unlinkTelegram()` or `unlinkMiniApp()`. Both remove provider `telegram`, clear its profile fields, and reject removal of the last account unless your app explicitly allows `accountLinking.allowUnlinkingAll`. Unlink OIDC with Better Auth's `unlinkAccount({ accountId })`, using the local account row ID from `listAccounts()`.
+
+Use native buttons, visible focus styles, a disabled/busy state while starting authentication, and an accessible status/error region in your own UI. The package does not impose a component framework or stylesheet.
+
+## Upgrading to 1.7
+
+This minor release retains the client helpers and the two package export paths. It requires Better Auth 1.7.7 and includes deliberate security corrections: the invalid bot-token OIDC-secret fallback and unverified Mini App authentication are removed. Unlinking now protects the last account. OIDC providers use the current `idToken` and `accountSubject` API. Custom standalone provider integrations must use Better Auth's `verifyProviderIdToken()` instead of the removed provider `verifyIdToken` method.
+
+See [migration and configuration](docs/configuration.md), [API reference](docs/api-reference.md), [security](docs/security.md), and [troubleshooting](docs/troubleshooting.md).
+
+## AI-agent integration skill
+
+```sh
+npx skills add mhbdev/tele-better-auth --skill tele-better-auth
 ```
 
-### Redirect flow
+The [skill](skills/tele-better-auth/SKILL.md) helps agents select a flow, configure credentials and schema, implement sign-in and linking, and verify popup behavior. It follows the `SKILL.md` frontmatter convention used by [skills.sh](https://skills.sh/docs). `skills.sh.json` groups it on the repository page; it is not a runtime dependency or a claim of certification. A skills.sh pack is optional and can reference this skill.
 
-```typescript
-authClient.initTelegramWidgetRedirect(
-  "telegram-login-container",
-  "/auth/telegram/callback",
-  { size: "large" },
-);
+## Development and releases
+
+```sh
+npm ci
+npm run lint
+npm run type-check
+npm run build
+npm run test:coverage
+npm run check:package
 ```
 
-### Mini Apps
+CI runs on Node 22, 24, and 26 and enforces coverage thresholds. Tag releases as `v<package.json version>`. [release.yml](.github/workflows/release.yml) verifies and packs the build, publishes with npm trusted publishing and provenance in environment `npm-release`, and attaches the package to a GitHub release. No npm publishing token is used.
 
-Enable on server:
-
-```typescript
-telegram({
-  botToken: process.env.TELEGRAM_BOT_TOKEN!,
-  botUsername: "your_bot_username",
-  miniApp: {
-    enabled: true,
-    validateInitData: true,
-    allowAutoSignin: true,
-  },
-});
-```
-
-Then on client:
-
-```typescript
-// auto sign-in (one less click, revolutionary)
-const result = await authClient.autoSignInFromMiniApp();
-
-// or manual
-const result = await authClient.signInWithMiniApp(
-  window.Telegram.WebApp.initData,
-);
-
-// or just validate without signing in
-const validation = await authClient.validateMiniApp(
-  window.Telegram.WebApp.initData,
-);
-```
-
-### OIDC (OpenID Connect)
-
-Standard OAuth 2.0 flow via `oauth.telegram.org`. Phone numbers, PKCE, RS256 JWTs — proper grown-up auth instead of widget callbacks. Telegram finally joined the federation.
-
-#### Prerequisites
-
-BotFather has a whole ritual for this. Skipping steps means `invalid_client` errors and Telegram silently falling back to Login Widget redirects like nothing happened. Don't skip steps.
-
-1. Open [@BotFather](https://t.me/botfather) **as a mini app** (not the chat — the mini app). Go to **Bot Settings > Web Login**
-2. Add your website URL. Then **remove it**. Yes, remove it. Close the panel, open **Web Login** again — a new option appears: **OpenID Connect Login**. This is a permanent, one-way switch. Telegram doesn't mention this anywhere because documentation is for the weak
-3. Go through the OIDC setup flow. It's permanent. No going back. Commitment issues? Too late
-4. Add your **Allowed URL** — your website origin (e.g., `https://example.com`). This is the trusted origin for the OAuth flow
-5. Add your **Redirect URL** — your OIDC callback (e.g., `https://example.com/api/auth/callback/telegram-oidc`). If this isn't registered, Telegram returns auth codes via `#tgAuthResult` fragment instead of `?code=` query param, and your server never sees them
-6. Copy your **Client ID** and **Client Secret**. They're right there on the screen. The Client Secret is NOT your bot token — BotFather generates a separate secret for OIDC. If you use the bot token, the token endpoint returns `invalid_client` and you'll spend hours debugging something that was never going to work
-
-For local dev, point both URLs at your [ngrok](https://ngrok.com) tunnel (e.g., `https://abc123.ngrok-free.app` and `https://abc123.ngrok-free.app/api/auth/callback/telegram-oidc`). Every time ngrok restarts, you get a new URL. Update BotFather. Repeat until Stockholm syndrome sets in.
-
-See [Telegram's official OIDC docs](https://core.telegram.org/bots/telegram-login) for the spec. It exists now. We're living in the future.
-
-#### Setup
-
-Enable on server:
-
-```typescript
-telegram({
-  botToken: process.env.TELEGRAM_BOT_TOKEN!,
-  botUsername: "your_bot_username",
-  oidc: {
-    enabled: true,
-    clientSecret: process.env.TELEGRAM_OIDC_CLIENT_SECRET!, // from BotFather Web Login
-    requestPhone: true, // get phone numbers, finally
-  },
-});
-```
-
-Then on client:
-
-```typescript
-// default: same-tab redirect
-await authClient.signInWithTelegramOIDC({
-  callbackURL: "/dashboard",
-});
-
-// optional: popup flow (falls back to same-tab if popup is blocked)
-await authClient.signInWithTelegramOIDC({
-  callbackURL: "/dashboard",
-  flow: "popup",
-});
-```
-
-That's it. Standard Better Auth social login under the hood. PKCE, state tokens, the works. You don't even need to think about it, which is the whole point.
-
-#### OIDC-only mode
-
-Don't need the Login Widget? Set `loginWidget: false` and skip the widget endpoints, rate limits, and the 5 Telegram-specific database columns entirely. Pure OIDC, no baggage:
-
-```typescript
-// OIDC-only (no widget endpoints, no extra schema fields)
-telegram({
-  botToken: process.env.TELEGRAM_BOT_TOKEN!,
-  botUsername: "your_bot_username",
-  loginWidget: false,
-  oidc: {
-    enabled: true,
-    clientSecret: process.env.TELEGRAM_OIDC_CLIENT_SECRET!,
-  },
-});
-```
-
-## Configuration
-
-| Option                         | Default                 | Description                                                |
-| ------------------------------ | ----------------------- | ---------------------------------------------------------- |
-| `botToken`                     | _required_              | From @BotFather                                            |
-| `botUsername`                  | _required_              | Without the @                                              |
-| `allowUserToLink`              | `true`                  | Let users link Telegram to existing accounts               |
-| `autoCreateUser`               | `true`                  | Create user on first sign-in                               |
-| `maxAuthAge`                   | `86400`                 | Auth data TTL in seconds (replay attack prevention)        |
-| `testMode`                     | `false`                 | Enable Telegram test server mode                           |
-| `loginWidget`                  | `true`                  | Enable Login Widget endpoints and schema fields            |
-| `mapTelegramDataToUser`        | —                       | Custom user data mapper                                    |
-| `miniApp.enabled`              | `false`                 | Enable Mini Apps endpoints                                 |
-| `miniApp.validateInitData`     | `true`                  | Verify Mini App initData                                   |
-| `miniApp.allowAutoSignin`      | `true`                  | Allow auto sign-in from Mini Apps                          |
-| `miniApp.mapMiniAppDataToUser` | —                       | Custom Mini App user mapper                                |
-| `oidc.enabled`                 | `false`                 | Enable Telegram OIDC flow                                  |
-| `oidc.clientSecret`            | —                       | Client Secret from BotFather Web Login (NOT the bot token) |
-| `oidc.scopes`                  | `["openid", "profile"]` | OIDC scopes to request                                     |
-| `oidc.requestPhone`            | `false`                 | Request phone number (adds `phone` scope)                  |
-| `oidc.requestBotAccess`        | `false`                 | Request bot access (adds `telegram:bot_access` scope)      |
-| `oidc.mapOIDCProfileToUser`    | —                       | Custom OIDC claims mapper                                  |
-
-Full types in [`src/types.ts`](./src/types.ts).
-
-## Endpoints
-
-| Method | Path                         | Auth    | Description                                           |
-| ------ | ---------------------------- | ------- | ----------------------------------------------------- |
-| POST   | `/telegram/signin`           | No      | Sign in with widget data (when `loginWidget` enabled) |
-| POST   | `/telegram/link`             | Session | Link Telegram to account (when `loginWidget` enabled) |
-| POST   | `/telegram/unlink`           | Session | Unlink Telegram (when `loginWidget` enabled)          |
-| GET    | `/telegram/config`           | No      | Get bot config (username, testMode, flags)            |
-| POST   | `/telegram/miniapp/signin`   | No      | Sign in from Mini App                                 |
-| POST   | `/telegram/miniapp/validate` | No      | Validate initData                                     |
-
-OIDC uses Better Auth's built-in social login routes — `POST /sign-in/social` with `provider: "telegram-oidc"` and `GET /callback/telegram-oidc`. No custom endpoints needed. Delegation at its finest.
-
-All endpoints are rate-limited. Signin/miniapp: 10 req/60s. Link/unlink: 5 req/60s. Validate: 20 req/60s. Brute-forcing was never a strategy, now it's also a throttled one.
-
-## Error Handling
-
-All endpoints throw `APIError` via `APIError.from()`. The plugin exposes `$ERROR_CODES` — each code is a `RawError` object with `code` and `message` properties:
-
-```typescript
-import { telegram } from "tele-better-auth";
-
-const plugin = telegram({ botToken: "...", botUsername: "..." });
-
-// In your error handler:
-if (error.code === plugin.$ERROR_CODES.NOT_AUTHENTICATED.code) {
-  // handle it
-}
-```
-
-No more comparing against magic strings. You're welcome.
-
-## Security
-
-HMAC-SHA-256 verification on all auth data via Web Crypto API (`crypto.subtle`). Timestamp validation against replay attacks. Bot token never touches the client. Works in every runtime that implements the Web Crypto standard — which is all of them now, congratulations internet.
-
-Login Widget uses `SHA256(botToken)` as secret key. Mini Apps use `HMAC-SHA256("WebAppData", botToken)`. Different derivation paths, same level of paranoia.
-
-OIDC adds RS256 JWT verification via Telegram's JWKS endpoint, plus PKCE and state tokens for the OAuth flow. Keys are fetched and matched by `kid` — no hardcoded secrets, no trust-me-bro validation.
-
-Is it bulletproof? No. Is it better than storing passwords in plain text? Significantly.
-
-## Troubleshooting
-
-**Widget not showing?** Did you `/setdomain` with @BotFather? Is `botUsername` correct (no @)? Does the container exist in DOM? Are you on HTTPS?
-
-**Auth fails?** Wrong bot token, domain mismatch with BotFather, or `auth_date` expired (24h default). Check browser console.
-
-**Local dev?** `ngrok http 3000`, use the ngrok URL in BotFather's `/setdomain` and as your app URL. Yes, it's annoying. Welcome to OAuth.
-
-**OIDC returns `invalid_client`?** You haven't registered Web Login in @BotFather (Bot Settings > Web Login). Or you're using the bot token as client secret instead of the separate secret BotFather provides. See [OIDC Prerequisites](#prerequisites).
-
-**OIDC redirects with `#tgAuthResult` instead of `?code=`?** Your redirect URI isn't registered in BotFather's Web Login Allowed URLs. Telegram falls back to Login Widget redirect mode. Register `https://yourdomain.com/api/auth/callback/telegram-oidc` in the Allowed URLs.
-
-## Examples
-
-See [`examples/nextjs-app/`](./examples/nextjs-app) for a Next.js implementation covering all three auth flows: Login Widget, OIDC, Mini Apps, plus account linking/unlinking. Copy-paste-ready components and server/client setup. There's also a full test playground app in [`test/`](./test) if you want to see everything wired together with a real database.
-
-## Migrating
-
-### To v1.5.0 (from v1.4.0)
-
-- No breaking changes. New `loginWidget` option defaults to `true` — existing setups are unaffected.
-- OIDC-only users can now set `loginWidget: false` to skip Widget endpoints and the 5 Telegram-specific database columns (`telegramId`, `telegramUsername`, `telegramPhoneNumber` on user; `telegramId`, `telegramUsername` on account).
-- Config endpoint now returns `loginWidgetEnabled` boolean. Client `getTelegramConfig` type updated accordingly.
-
-### To v1.4.0 (from v1.3.x)
-
-- **OIDC users**: Add `oidc.clientSecret` — the Client Secret from BotFather's Web Login settings (Bot Settings > Web Login). This is NOT the bot token. Register your Allowed URLs there too, including `https://yourdomain.com/api/auth/callback/telegram-oidc`. The plugin falls back to bot token if `clientSecret` is omitted (with a warning), but Telegram rejects bot tokens as OIDC client secrets. Removed non-standard `origin` and `bot_id` params from the auth URL. See [OIDC Prerequisites](#prerequisites).
-- Login Widget and Mini App flows are unaffected.
-
-### To v1.3.x (from v1.2.0)
-
-- No breaking changes. v1.3.x added graceful `verifyIdToken` failure, placeholder email generation, diagnostic `getUserInfo` logging, and `origin` param (now removed in v1.4.0). If you're using OIDC, skip straight to v1.4.0.
-
-### To v1.2.0 (from v1.1.0)
-
-- No breaking changes. `testMode` is opt-in (default `false`). `BetterAuthPluginRegistry` module augmentation is type-only — zero runtime impact. Config endpoint now returns `testMode` boolean. Your existing code doesn't care.
-
-### To v1.1.0 (from v1.0.0)
-
-- **Peer dep bumped to `better-auth@^1.6.11`** — upgrade better-auth first, then update the plugin. The `$ERROR_CODES` type changed from `Record<string, string>` to `Record<string, RawError>` and this release follows suit.
-
-### To v1.0.0 (from v0.4.0)
-
-- No breaking changes. OIDC is opt-in (`oidc.enabled: false` by default). Add `telegramPhoneNumber` column to your user table if you plan to use OIDC with phone scope.
-
-### To v0.4.0 (from v0.3.x)
-
-- **Verification functions are now async** — `verifyTelegramAuth()` and `verifyMiniAppInitData()` return `Promise<boolean>`. Slap an `await` in front if you're calling them directly.
-- **Errors throw `APIError`** — all endpoints throw `APIError` instead of returning `ctx.json({ error })`. Switch to Better Auth's standard error shape.
-- **ESM-first** — `"type": "module"` in package.json. CJS still works via `.cjs` exports.
-
-Full changelog in [CHANGELOG.md](./CHANGELOG.md).
-
-## Links
-
-- [Better Auth](https://better-auth.com)
-- [Telegram Login Widget](https://core.telegram.org/bots/telegram-login)
-- [Telegram Mini Apps](https://core.telegram.org/bots/webapps)
-- [Telegram OIDC](https://core.telegram.org/bots/features#oidc-authorization)
-- [GitHub](https://github.com/mhbdev/tele-better-auth)
-- [Changelog](./CHANGELOG.md)
-
-## License
-
-MIT — do whatever you want. I'm not your lawyer.
-
-Created by [Vibe Code](https://x.com/vcode_sh).
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security reports](https://github.com/mhbdev/tele-better-auth/security/advisories/new) · [MIT license](LICENSE)

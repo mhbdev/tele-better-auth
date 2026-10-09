@@ -3,34 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "dev": "next dev",
+    "lint": "npm --prefix .. run lint",
+    "start": "next start",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
-    "better-auth": "^1.6.11",
-    "tele-better-auth": "file:..",
-    "better-sqlite3": "^12.6.2",
-    "next": "^16.1.6",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "@next/env": "16.4.0",
+    "@prisma/adapter-better-sqlite3": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "better-auth": "1.7.7",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tele-better-auth": "file:.."
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.3.3",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "eslint": "^9.39.3",
-    "eslint-config-next": "^16.1.6",
-    "postcss": "^8.5.6",
-    "prisma": "^6.19.2",
-    "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3"
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "postcss": "8.5.29",
+    "prisma": "7.10.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2"
   }
 }

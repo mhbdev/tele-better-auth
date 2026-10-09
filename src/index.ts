@@ -1,4 +1,5 @@
 import type { BetterAuthPlugin } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { createConfigEndpoint } from "./config-endpoint";
 import { ERROR_CODES, PLUGIN_ID } from "./constants";
 import {
@@ -12,7 +13,7 @@ import type { TelegramPluginOptions } from "./types";
 import { createWidgetEndpoints, getWidgetRateLimits } from "./widget-endpoints";
 
 // biome-ignore lint/performance/noBarrelFile: Public API re-export
-export { createTelegramOIDCProvider } from "./oidc";
+export { createTelegramOIDCProvider, telegramOAuth } from "./oidc";
 export type { TelegramPluginConfig } from "./plugin-config";
 export type {
   TelegramAccountRecord,
@@ -47,6 +48,21 @@ export const telegram = (options: TelegramPluginOptions) => {
   const config = createPluginConfig(options);
 
   return {
+    hooks: {
+      before: [
+        {
+          handler: createAuthMiddleware(() => {
+            if (!config.allowUserToLink) {
+              throw APIError.from("FORBIDDEN", ERROR_CODES.LINKING_DISABLED);
+            }
+            return Promise.resolve();
+          }),
+          matcher: (ctx) =>
+            ctx.path === "/link-social" &&
+            ctx.body?.provider === "telegram-oidc",
+        },
+      ],
+    },
     id: PLUGIN_ID,
 
     // Inject OIDC provider into better-auth's social providers
@@ -55,7 +71,11 @@ export const telegram = (options: TelegramPluginOptions) => {
           init: (ctx) => ({
             context: {
               socialProviders: [
-                createTelegramOIDCProvider(config.botToken, config.oidc!),
+                createTelegramOIDCProvider(config.botToken, {
+                  ...config.oidc!,
+                  disableSignUp:
+                    config.oidc?.disableSignUp ?? !config.autoCreateUser,
+                }),
                 ...ctx.socialProviders,
               ],
             },
@@ -63,7 +83,7 @@ export const telegram = (options: TelegramPluginOptions) => {
         }
       : {}),
 
-    schema: createTelegramSchema(config),
+    $ERROR_CODES: ERROR_CODES,
 
     endpoints: {
       ...(config.widgetEnabled ? createWidgetEndpoints(config) : {}),
@@ -71,12 +91,12 @@ export const telegram = (options: TelegramPluginOptions) => {
       ...createConfigEndpoint(config),
     },
 
-    $ERROR_CODES: ERROR_CODES,
-
     rateLimit: [
       ...(config.widgetEnabled ? getWidgetRateLimits() : []),
       ...(config.miniAppEnabled ? getMiniAppRateLimits() : []),
     ],
+
+    schema: createTelegramSchema(config),
   } satisfies BetterAuthPlugin;
 };
 

@@ -13,21 +13,30 @@ export function TelegramLoginButton() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let disposed = false;
+    let dispose: (() => void) | undefined;
     authClient
       .initTelegramWidget(
         "telegram-login-container",
         {
-          size: "large",
-          showUserPhoto: true,
           cornerRadius: 20,
           lang: "en",
+          showUserPhoto: true,
+          size: "large",
         },
         async (authData) => {
+          if (disposed) {
+            return;
+          }
           setLoading(true);
           setError(null);
 
           try {
-            await authClient.signInWithTelegram(authData);
+            const result = await authClient.signInWithTelegram(authData);
+            if (result.error) {
+              setError(result.error.message || "Failed to sign in");
+              return;
+            }
             router.push("/dashboard");
           } catch {
             setError("Failed to sign in with Telegram");
@@ -36,9 +45,20 @@ export function TelegramLoginButton() {
           }
         }
       )
+      .then((cleanup) => {
+        if (disposed) {
+          cleanup();
+        } else {
+          dispose = cleanup;
+        }
+      })
       .catch(() => {
         setError("Failed to load Telegram login widget");
       });
+    return () => {
+      disposed = true;
+      dispose?.();
+    };
   }, [router]);
 
   return (
@@ -49,7 +69,11 @@ export function TelegramLoginButton() {
         <div className="text-gray-600 text-sm">Signing in with Telegram...</div>
       )}
 
-      {error && <div className="text-red-600 text-sm">{error}</div>}
+      {error && (
+        <div className="text-red-600 text-sm" role="alert">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

@@ -17,11 +17,13 @@ vi.mock("better-auth/api", () => {
   }
 
   return {
+    APIError: MockAPIError,
     createAuthEndpoint: vi.fn(
       (_path: string, _options: any, handler: any) => handler
     ),
+    createAuthMiddleware: (handler: any) => handler,
+    freshSessionMiddleware: {},
     sessionMiddleware: {},
-    APIError: MockAPIError,
   };
 });
 
@@ -30,11 +32,11 @@ vi.mock("better-auth/cookies", () => ({
 }));
 
 vi.mock("./verify", () => ({
-  verifyTelegramAuth: vi.fn(),
-  verifyMiniAppInitData: vi.fn(),
-  validateTelegramAuthData: vi.fn(),
-  validateMiniAppData: vi.fn(),
   parseMiniAppInitData: vi.fn(),
+  validateMiniAppData: vi.fn(),
+  validateTelegramAuthData: vi.fn(),
+  verifyMiniAppInitData: vi.fn(),
+  verifyTelegramAuth: vi.fn(),
 }));
 
 const BOT_TOKEN = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz";
@@ -100,7 +102,10 @@ describe("loginWidget option", () => {
     it("loginWidget: false + oidc enabled → schema is undefined (OIDC doesn't need telegramId fields)", async () => {
       const { telegram } = await import("./index");
       const plugin = telegram(
-        baseOpts({ loginWidget: false, oidc: { enabled: true } })
+        baseOpts({
+          loginWidget: false,
+          oidc: { clientSecret: "test-oidc-secret", enabled: true },
+        })
       );
 
       expect(plugin.schema).toBeUndefined();
@@ -112,7 +117,7 @@ describe("loginWidget option", () => {
         baseOpts({
           loginWidget: false,
           miniApp: { enabled: true },
-          oidc: { enabled: true },
+          oidc: { clientSecret: "test-oidc-secret", enabled: true },
         })
       );
 
@@ -288,7 +293,7 @@ describe("loginWidget option", () => {
         baseOpts({
           loginWidget: true,
           miniApp: { enabled: true },
-          oidc: { enabled: true },
+          oidc: { clientSecret: "test-oidc-secret", enabled: true },
         })
       );
 
@@ -341,10 +346,16 @@ describe("loginWidget option", () => {
       const { telegram } = await import("./index");
 
       const pluginWidgetOn = telegram(
-        baseOpts({ loginWidget: true, oidc: { enabled: true } })
+        baseOpts({
+          loginWidget: true,
+          oidc: { clientSecret: "test-oidc-secret", enabled: true },
+        })
       );
       const pluginWidgetOff = telegram(
-        baseOpts({ loginWidget: false, oidc: { enabled: true } })
+        baseOpts({
+          loginWidget: false,
+          oidc: { clientSecret: "test-oidc-secret", enabled: true },
+        })
       );
 
       expect(pluginWidgetOn).toHaveProperty("init");
@@ -361,8 +372,8 @@ describe("loginWidget option", () => {
       telegram(
         baseOpts({
           loginWidget: false,
+          oidc: { clientSecret: "test-oidc-secret", enabled: true },
           testMode: true,
-          oidc: { enabled: true },
         })
       );
 

@@ -21,11 +21,13 @@ vi.mock("better-auth/api", () => {
     }
   }
   return {
+    APIError: MockAPIError,
     createAuthEndpoint: vi.fn(
       (_path: string, _options: any, handler: any) => handler
     ),
+    createAuthMiddleware: (handler: any) => handler,
+    freshSessionMiddleware: {},
     sessionMiddleware: {},
-    APIError: MockAPIError,
   };
 });
 
@@ -34,9 +36,9 @@ vi.mock("better-auth/cookies", () => ({
 }));
 
 vi.mock("./verify", () => ({
-  verifyMiniAppInitData: vi.fn(),
   parseMiniAppInitData: vi.fn(),
   validateMiniAppData: vi.fn(),
+  verifyMiniAppInitData: vi.fn(),
 }));
 
 import { ERROR_CODES } from "./constants";
@@ -58,43 +60,44 @@ const mockedValidate = vi.mocked(validateMiniAppData);
 const INIT_DATA = "user=%7B%22id%22%3A99%7D&auth_date=1700000000&hash=abc";
 
 const PARSED_DATA = {
-  user: {
-    id: 99,
-    first_name: "Bob",
-    last_name: "Jones",
-    username: "bobjones",
-    photo_url: "https://t.me/bob.jpg",
-  },
   auth_date: 1700000000,
   hash: "abc",
+  user: {
+    first_name: "Bob",
+    id: 99,
+    last_name: "Jones",
+    photo_url: "https://t.me/bob.jpg",
+    username: "bobjones",
+  },
 };
 
 function makeConfig(
   overrides: Partial<TelegramPluginConfig> = {}
 ): TelegramPluginConfig {
   return {
-    botToken: "tok:en",
-    botUsername: "bot",
-    widgetEnabled: false,
-    miniAppEnabled: true,
-    oidcEnabled: false,
-    oidcClientId: "123456789",
-    testMode: false,
     allowUserToLink: true,
     autoCreateUser: true,
+    botToken: "tok:en",
+    botUsername: "bot",
     maxAuthAge: 86400,
-    miniAppValidateInitData: true,
     miniAppAllowAutoSignin: true,
+    miniAppEnabled: true,
+    miniAppValidateInitData: true,
+    oidcClientId: "123456789",
+    oidcEnabled: false,
+    testMode: false,
+    widgetEnabled: false,
     ...overrides,
   };
 }
 
 function mockAdapter(overrides: Record<string, any> = {}) {
   return {
-    findOne: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({ id: "new-id" }),
-    update: vi.fn(),
     delete: vi.fn(),
+    findOne: vi.fn().mockResolvedValue(null),
+    transaction: (callback: any) => callback({}),
+    update: vi.fn(),
     ...overrides,
   };
 }
@@ -105,10 +108,44 @@ function mockCtx(adapter: any, body: any) {
     context: {
       adapter,
       internalAdapter: {
+        createOAuthUser: async (user: any, account: any) => {
+          const created = await adapter.create({ data: user, model: "user" });
+          return {
+            account: await adapter.create({
+              data: { ...account, userId: created.id },
+              model: "account",
+            }),
+            user: created,
+          };
+        },
         createSession: vi
           .fn()
           .mockResolvedValue({ id: "sess-1", token: "tok" }),
+        deleteAccount: (id: string) =>
+          adapter.delete({
+            model: "account",
+            where: [{ field: "id", value: id }],
+          }),
+        findAccounts: async () => {
+          const account = await adapter.findOne({ model: "account" });
+          return account
+            ? [account, { id: "credential", providerId: "credential" }]
+            : [];
+        },
+        findUserById: (id: string) =>
+          adapter.findOne({
+            model: "user",
+            where: [{ field: "id", value: id }],
+          }),
+        linkAccount: (data: any) => adapter.create({ data, model: "account" }),
+        updateUser: (id: string, update: any) =>
+          adapter.update({
+            model: "user",
+            update,
+            where: [{ field: "id", value: id }],
+          }),
       },
+      options: {},
     },
     json: vi.fn((data: any) => data),
   };
@@ -152,10 +189,10 @@ describe("signInWithMiniApp", () => {
     );
   });
 
-  it("skips verification when miniAppValidateInitData is false", async () => {
+  it("verifies even when a legacy config disables validation", async () => {
     mockedVerify.mockResolvedValue(false); // would fail if called
     const adapter = mockAdapter({
-      findOne: vi.fn().mockResolvedValue({ userId: "u1", id: "a1" }),
+      findOne: vi.fn().mockResolvedValue({ id: "a1", userId: "u1" }),
     });
 
     const endpoints = createMiniAppEndpoints(
@@ -164,8 +201,10 @@ describe("signInWithMiniApp", () => {
     const ctx = mockCtx(adapter, { initData: INIT_DATA });
 
     // Should NOT throw despite verify returning false
-    await (endpoints.signInWithMiniApp as any)(ctx);
-    expect(mockedVerify).not.toHaveBeenCalled();
+    await expect((endpoints.signInWithMiniApp as any)(ctx)).rejects.toThrow(
+      ERROR_CODES.INVALID_MINI_APP_INIT_DATA.message
+    );
+    expect(mockedVerify).toHaveBeenCalled();
   });
 
   it("rejects invalid data structure", async () => {
@@ -196,7 +235,7 @@ describe("signInWithMiniApp", () => {
     const adapter = mockAdapter({
       findOne: vi.fn().mockImplementation(({ model }: any) => {
         if (model === "account") {
-          return { userId: "existing-u", id: "a1" };
+          return { id: "a1", userId: "existing-u" };
         }
         if (model === "user") {
           return { id: "existing-u", name: "Bob" };
@@ -242,19 +281,25 @@ describe("signInWithMiniApp", () => {
     // Should create account link only
     expect(adapter.create).toHaveBeenCalledTimes(1);
     expect(adapter.create).toHaveBeenCalledWith({
-      model: "account",
       data: {
-        userId: "user-tg",
-        providerId: "telegram",
         accountId: "99",
+        providerId: "telegram",
         telegramId: "99",
         telegramUsername: "bobjones",
+        userId: "user-tg",
       },
+      model: "account",
     });
   });
 
   it("creates new user when autoCreateUser and miniAppAllowAutoSignin are true", async () => {
     const adapter = mockAdapter({
+      create: vi.fn().mockImplementation(({ model }: any) => {
+        if (model === "user") {
+          return { id: "new-u" };
+        }
+        return { id: "acc-1" };
+      }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         if (model === "user") {
           const idFilter = where.find((w: any) => w.field === "id");
@@ -263,12 +308,6 @@ describe("signInWithMiniApp", () => {
           }
         }
         return null;
-      }),
-      create: vi.fn().mockImplementation(({ model }: any) => {
-        if (model === "user") {
-          return { id: "new-u" };
-        }
-        return { id: "acc-1" };
       }),
     });
 
@@ -308,11 +347,12 @@ describe("signInWithMiniApp", () => {
 
   it("uses mapMiniAppDataToUser when provided", async () => {
     const mapper = vi.fn(() => ({
-      name: "Custom Bob",
       email: "bob@example.com",
+      name: "Custom Bob",
     }));
 
     const adapter = mockAdapter({
+      create: vi.fn().mockResolvedValue({ id: "new-u" }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         if (model === "user") {
           const idFilter = where.find((w: any) => w.field === "id");
@@ -322,7 +362,6 @@ describe("signInWithMiniApp", () => {
         }
         return null;
       }),
-      create: vi.fn().mockResolvedValue({ id: "new-u" }),
     });
 
     const endpoints = createMiniAppEndpoints(
@@ -337,12 +376,13 @@ describe("signInWithMiniApp", () => {
 
   it("builds name without last_name", async () => {
     mockedParse.mockReturnValue({
-      user: { id: 99, first_name: "Bob" },
       auth_date: 1700000000,
       hash: "abc",
+      user: { first_name: "Bob", id: 99 },
     } as any);
 
     const adapter = mockAdapter({
+      create: vi.fn().mockResolvedValue({ id: "u1" }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         if (model === "user") {
           const idFilter = where.find((w: any) => w.field === "id");
@@ -352,7 +392,6 @@ describe("signInWithMiniApp", () => {
         }
         return null;
       }),
-      create: vi.fn().mockResolvedValue({ id: "u1" }),
     });
 
     const endpoints = createMiniAppEndpoints(makeConfig());
@@ -365,7 +404,7 @@ describe("signInWithMiniApp", () => {
   it("passes botToken and maxAuthAge to verifyMiniAppInitData", async () => {
     const config = makeConfig({ botToken: "my:tok", maxAuthAge: 500 });
     const adapter = mockAdapter({
-      findOne: vi.fn().mockResolvedValue({ userId: "u1", id: "a1" }),
+      findOne: vi.fn().mockResolvedValue({ id: "a1", userId: "u1" }),
     });
 
     const endpoints = createMiniAppEndpoints(config);
@@ -409,8 +448,8 @@ describe("validateMiniApp", () => {
     await (endpoints.validateMiniApp as any)(ctx);
 
     expect(ctx.json).toHaveBeenCalledWith({
-      valid: false,
       data: null,
+      valid: false,
     });
   });
 
@@ -423,8 +462,8 @@ describe("validateMiniApp", () => {
     await (endpoints.validateMiniApp as any)(ctx);
 
     expect(ctx.json).toHaveBeenCalledWith({
-      valid: true,
       data: PARSED_DATA,
+      valid: true,
     });
   });
 
@@ -445,7 +484,7 @@ describe("validateMiniApp", () => {
 describe("getMiniAppRateLimits", () => {
   it("returns 2 rate limit rules", () => {
     const limits = getMiniAppRateLimits();
-    expect(limits).toHaveLength(2);
+    expect(limits).toHaveLength(3);
   });
 
   it("matches correct paths", () => {

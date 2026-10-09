@@ -10,7 +10,7 @@ async function hmacSha256(key: Uint8Array, data: string): Promise<ArrayBuffer> {
   const cryptoKey = await globalThis.crypto.subtle.importKey(
     "raw",
     key as BufferSource,
-    { name: "HMAC", hash: "SHA-256" },
+    { hash: "SHA-256", name: "HMAC" },
     false,
     ["sign"]
   );
@@ -40,6 +40,31 @@ function bufferToHex(buffer: ArrayBuffer): string {
     .join("");
 }
 
+function isFresh(authDate: number, maxAge: number): boolean {
+  const now = Math.floor(Date.now() / 1000);
+  return (
+    Number.isSafeInteger(authDate) &&
+    authDate > 0 &&
+    Number.isFinite(maxAge) &&
+    maxAge >= 0 &&
+    authDate <= now &&
+    now - authDate <= maxAge
+  );
+}
+
+function equalHash(expected: string, received: string): boolean {
+  if (!/^[a-f0-9]{64}$/.test(received)) {
+    return false;
+  }
+  let difference = 0;
+  const normalized = received;
+  for (let index = 0; index < expected.length; index += 1) {
+    // biome-ignore lint/suspicious/noBitwiseOperators: Accumulate differences without early exit.
+    difference |= expected.charCodeAt(index) ^ normalized.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
 /**
  * Verifies the authenticity of Telegram authentication data
  * @param data - Authentication data from Telegram Login Widget
@@ -52,19 +77,24 @@ export async function verifyTelegramAuth(
   botToken: string,
   maxAge = DEFAULT_MAX_AUTH_AGE
 ): Promise<boolean> {
+  if (!validateTelegramAuthData(data)) {
+    return false;
+  }
   // Extract hash from data
   const { hash, ...dataWithoutHash } = data;
 
   // Check auth_date is not too old
   const authDate = dataWithoutHash.auth_date;
-  const currentTime = Math.floor(Date.now() / 1000);
-
-  if (currentTime - authDate > maxAge) {
+  if (!isFresh(authDate, maxAge)) {
     return false;
   }
 
   // Create data-check-string
   const dataCheckString = Object.keys(dataWithoutHash)
+    .filter(
+      (key) =>
+        dataWithoutHash[key as keyof typeof dataWithoutHash] !== undefined
+    )
     .sort()
     .map((key) => {
       const value = dataWithoutHash[key as keyof typeof dataWithoutHash];
@@ -79,7 +109,7 @@ export async function verifyTelegramAuth(
   const hmac = bufferToHex(await hmacSha256(secretKey, dataCheckString));
 
   // Compare with received hash
-  return hmac === hash;
+  return equalHash(hmac, hash);
 }
 
 /**
@@ -90,7 +120,10 @@ export function validateTelegramAuthData(data: any): data is TelegramAuthData {
     typeof data === "object" &&
     data !== null &&
     typeof data.id === "number" &&
+    Number.isSafeInteger(data.id) &&
+    data.id > 0 &&
     typeof data.first_name === "string" &&
+    data.first_name.length > 0 &&
     typeof data.auth_date === "number" &&
     typeof data.hash === "string"
   );
@@ -136,6 +169,9 @@ export async function verifyMiniAppInitData(
   maxAge = DEFAULT_MAX_AUTH_AGE
 ): Promise<boolean> {
   const params = new URLSearchParams(initData);
+  if (new Set(params.keys()).size !== Array.from(params.keys()).length) {
+    return false;
+  }
   const hash = params.get("hash");
 
   if (!hash) {
@@ -152,15 +188,18 @@ export async function verifyMiniAppInitData(
   }
 
   const authDateNum = Number(authDate);
-  const currentTime = Math.floor(Date.now() / 1000);
-
-  if (currentTime - authDateNum > maxAge) {
+  if (!isFresh(authDateNum, maxAge)) {
     return false;
   }
 
   // Create data-check-string (sorted alphabetically)
   const dataCheckString = Array.from(params.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => {
+      if (a === b) {
+        return 0;
+      }
+      return a < b ? -1 : 1;
+    })
     .map(([key, value]) => `${key}=${value}`)
     .join("\n");
 
@@ -175,7 +214,7 @@ export async function verifyMiniAppInitData(
   );
 
   // Compare with received hash
-  return calculatedHash === hash;
+  return equalHash(calculatedHash, hash);
 }
 
 /**
@@ -186,10 +225,15 @@ export function validateMiniAppData(data: any): data is TelegramMiniAppData {
     typeof data === "object" &&
     data !== null &&
     typeof data.auth_date === "number" &&
+    Number.isSafeInteger(data.auth_date) &&
+    data.auth_date > 0 &&
     typeof data.hash === "string" &&
     (data.user === undefined ||
       (typeof data.user === "object" &&
+        data.user !== null &&
         typeof data.user.id === "number" &&
+        Number.isSafeInteger(data.user.id) &&
+        data.user.id > 0 &&
         typeof data.user.first_name === "string"))
   );
 }

@@ -1,11 +1,30 @@
 {
   "name": "tele-better-auth",
-  "version": "1.6.4",
-  "type": "module",
+  "version": "1.7.0",
   "description": "Telegram authentication plugin for Better Auth",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "keywords": [
+    "better-auth",
+    "better-auth-plugin",
+    "telegram",
+    "telegram-login",
+    "telegram-mini-apps",
+    "authentication",
+    "oauth",
+    "plugin",
+    "typescript"
+  ],
+  "homepage": "https://github.com/mhbdev/tele-better-auth#readme",
+  "bugs": {
+    "url": "https://github.com/mhbdev/tele-better-auth/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mhbdev/tele-better-auth.git"
+  },
+  "license": "MIT",
+  "author": "mhbdev",
+  "sideEffects": false,
+  "type": "module",
   "exports": {
     ".": {
       "import": {
@@ -28,69 +47,53 @@
       }
     }
   },
-  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "type-check": "tsc --noEmit",
+    "build": "tsdown",
+    "check:package": "node scripts/check-package.mjs",
+    "dev": "tsdown --watch",
+    "lint": "ultracite check",
+    "lint:fix": "ultracite fix",
+    "prepublishOnly": "npm run lint && npm run type-check && npm run build && npm run test:coverage && npm run check:package",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "lint": "npx ultracite check",
-    "lint:fix": "npx ultracite fix",
-    "prepublishOnly": "npm run type-check && npm run test && npm run build"
-  },
-  "keywords": [
-    "better-auth",
-    "better-auth-plugin",
-    "telegram",
-    "telegram-login",
-    "telegram-mini-apps",
-    "authentication",
-    "oauth",
-    "plugin",
-    "typescript"
-  ],
-  "author": "mhbdev",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mhbdev/tele-better-auth.git"
-  },
-  "bugs": {
-    "url": "https://github.com/mhbdev/tele-better-auth/issues"
-  },
-  "homepage": "https://github.com/mhbdev/tele-better-auth#readme",
-  "peerDependencies": {
-    "better-auth": "^1.6.11"
-  },
-  "engines": {
-    "node": ">=22.0.0"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.4.4",
-    "@types/node": "^25.3.0",
-    "@vitest/coverage-v8": "4.0.18",
-    "@vitest/ui": "^4.0.18",
-    "better-auth": "1.6.11",
-    "happy-dom": "20.7.0",
-    "lint-staged": "16.2.7",
-    "tsup": "8.5.1",
-    "typescript": "5.9.3",
-    "ultracite": "7.2.3",
-    "vitest": "4.0.18"
-  },
-  "overrides": {
-    "hono": "4.12.3",
-    "lodash": "4.17.23"
+    "test:ui": "vitest --ui",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css}": [
       "npx ultracite fix"
     ]
+  },
+  "dependencies": {
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "@better-auth/core": "1.7.7",
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "26.6.4",
+    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/ui": "5.0.3",
+    "better-auth": "1.7.7",
+    "happy-dom": "20.14.6",
+    "lint-staged": "17.6.0",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2",
+    "ultracite": "7.12.4",
+    "vitest": "5.0.3"
+  },
+  "peerDependencies": {
+    "@better-auth/core": "^1.7.7",
+    "better-auth": "^1.7.7"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

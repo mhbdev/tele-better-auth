@@ -13,16 +13,37 @@ describe("verifyTelegramAuth", () => {
   const BotToken = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz";
   let validAuthData: TelegramAuthData;
 
+  it.each([
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1,
+    1.5,
+    Math.floor(Date.now() / 1000) + 600,
+  ])("rejects a freshly signed invalid timestamp: %s", async (auth_date) => {
+    const data = { auth_date, first_name: "John", id: 42 };
+    const check = Object.entries(data)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value}`)
+      .join("\n");
+    const hash = createHmac(
+      "sha256",
+      createHash("sha256").update(BotToken).digest()
+    )
+      .update(check)
+      .digest("hex");
+    expect(await verifyTelegramAuth({ ...data, hash }, BotToken)).toBe(false);
+  });
+
   beforeEach(() => {
     // Create valid auth data for each test
     const currentTime = Math.floor(Date.now() / 1000);
     const dataWithoutHash = {
-      id: 123456789,
-      first_name: "John",
-      last_name: "Doe",
-      username: "johndoe",
-      photo_url: "https://example.com/photo.jpg",
       auth_date: currentTime,
+      first_name: "John",
+      id: 123456789,
+      last_name: "Doe",
+      photo_url: "https://example.com/photo.jpg",
+      username: "johndoe",
     };
 
     // Generate valid hash
@@ -54,9 +75,9 @@ describe("verifyTelegramAuth", () => {
     it("should verify data with only required fields", async () => {
       const currentTime = Math.floor(Date.now() / 1000);
       const minimalData = {
-        id: 123456789,
-        first_name: "John",
         auth_date: currentTime,
+        first_name: "John",
+        id: 123456789,
       };
 
       const dataCheckString = Object.keys(minimalData)
@@ -252,13 +273,13 @@ describe("verifyTelegramAuth", () => {
     it("should verify regardless of field order in original data", async () => {
       // Create data with fields in different order
       const unorderedData = {
-        hash: validAuthData.hash,
-        username: validAuthData.username,
-        id: validAuthData.id,
         auth_date: validAuthData.auth_date,
         first_name: validAuthData.first_name,
-        photo_url: validAuthData.photo_url,
+        hash: validAuthData.hash,
+        id: validAuthData.id,
         last_name: validAuthData.last_name,
+        photo_url: validAuthData.photo_url,
+        username: validAuthData.username,
       } as TelegramAuthData;
 
       const result = await verifyTelegramAuth(unorderedData, BotToken);
@@ -298,10 +319,10 @@ describe("verifyTelegramAuth", () => {
     it("should handle special characters in names", async () => {
       const currentTime = Math.floor(Date.now() / 1000);
       const specialCharsData = {
-        id: 123456789,
-        first_name: "José María",
-        last_name: "O'Brien-Smith",
         auth_date: currentTime,
+        first_name: "José María",
+        id: 123456789,
+        last_name: "O'Brien-Smith",
       };
 
       // Generate valid hash
@@ -328,10 +349,10 @@ describe("verifyTelegramAuth", () => {
     it("should handle Unicode in usernames", async () => {
       const currentTime = Math.floor(Date.now() / 1000);
       const unicodeData = {
-        id: 123456789,
-        first_name: "User",
-        username: "用户名",
         auth_date: currentTime,
+        first_name: "User",
+        id: 123456789,
+        username: "用户名",
       };
 
       // Generate valid hash
@@ -355,10 +376,10 @@ describe("verifyTelegramAuth", () => {
     it("should handle very long photo URLs", async () => {
       const currentTime = Math.floor(Date.now() / 1000);
       const longUrlData = {
-        id: 123456789,
-        first_name: "User",
-        photo_url: `https://example.com/${"a".repeat(1000)}.jpg`,
         auth_date: currentTime,
+        first_name: "User",
+        id: 123456789,
+        photo_url: `https://example.com/${"a".repeat(1000)}.jpg`,
       };
 
       // Generate valid hash
@@ -385,10 +406,10 @@ describe("validateTelegramAuthData", () => {
   describe("Valid data", () => {
     it("should return true for valid minimal auth data", () => {
       const data = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(true);
@@ -396,13 +417,13 @@ describe("validateTelegramAuthData", () => {
 
     it("should return true for valid complete auth data", () => {
       const data = {
-        id: 123456789,
-        first_name: "John",
-        last_name: "Doe",
-        username: "johndoe",
-        photo_url: "https://example.com/photo.jpg",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
+        last_name: "Doe",
+        photo_url: "https://example.com/photo.jpg",
+        username: "johndoe",
       };
 
       expect(validateTelegramAuthData(data)).toBe(true);
@@ -432,8 +453,8 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when missing id", () => {
       const data = {
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
       };
 
@@ -442,9 +463,9 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when missing first_name", () => {
       const data = {
-        id: 123456789,
         auth_date: 1234567890,
         hash: "abc123",
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -452,9 +473,9 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when missing auth_date", () => {
       const data = {
-        id: 123456789,
         first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -462,9 +483,9 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when missing hash", () => {
       const data = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -472,10 +493,10 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when id is string", () => {
       const data = {
-        id: "123456789",
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: "123456789",
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -483,10 +504,10 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when first_name is number", () => {
       const data = {
-        id: 123456789,
-        first_name: 123,
         auth_date: 1234567890,
+        first_name: 123,
         hash: "abc123",
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -494,10 +515,10 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when auth_date is string", () => {
       const data = {
-        id: 123456789,
-        first_name: "John",
         auth_date: "1234567890",
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -505,10 +526,10 @@ describe("validateTelegramAuthData", () => {
 
     it("should return false when hash is number", () => {
       const data = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: 123,
+        id: 123456789,
       };
 
       expect(validateTelegramAuthData(data)).toBe(false);
@@ -522,10 +543,10 @@ describe("validateTelegramAuthData", () => {
   describe("Type narrowing", () => {
     it("should narrow type to TelegramAuthData when true", () => {
       const data: unknown = {
-        id: 123456789,
-        first_name: "John",
         auth_date: 1234567890,
+        first_name: "John",
         hash: "abc123",
+        id: 123456789,
       };
 
       if (validateTelegramAuthData(data)) {
@@ -550,8 +571,8 @@ describe("parseMiniAppInitData", () => {
 
   it("should parse initData with user object", () => {
     const user = {
-      id: 123456789,
       first_name: "John",
+      id: 123456789,
       last_name: "Doe",
       username: "johndoe",
     };
@@ -565,15 +586,15 @@ describe("parseMiniAppInitData", () => {
 
   it("should parse initData with all fields", () => {
     const user = {
-      id: 123456789,
       first_name: "John",
-      language_code: "en",
+      id: 123456789,
       is_premium: true,
+      language_code: "en",
     };
     const chat = {
       id: 987654321,
-      type: "private",
       title: "Test Chat",
+      type: "private",
     };
 
     const initData = [
@@ -624,15 +645,15 @@ describe("verifyMiniAppInitData", () => {
     authDate: number = Math.floor(Date.now() / 1000)
   ): string {
     const user = {
-      id: 123456789,
       first_name: "John",
+      id: 123456789,
       username: "johndoe",
     };
 
     const params = new URLSearchParams({
-      user: JSON.stringify(user),
       auth_date: authDate.toString(),
       query_id: "AAE123",
+      user: JSON.stringify(user),
     });
 
     // Calculate hash
@@ -803,12 +824,12 @@ describe("validateMiniAppData", () => {
 
     it("should return true for data with user", () => {
       const data = {
-        user: {
-          id: 123456789,
-          first_name: "John",
-        },
         auth_date: 1234567890,
         hash: "abc123",
+        user: {
+          first_name: "John",
+          id: 123456789,
+        },
       };
 
       expect(validateMiniAppData(data)).toBe(true);
@@ -816,18 +837,18 @@ describe("validateMiniAppData", () => {
 
     it("should return true for complete data", () => {
       const data: TelegramMiniAppData = {
+        auth_date: 1234567890,
+        chat_type: "private",
+        hash: "abc123",
+        query_id: "AAE123",
         user: {
-          id: 123456789,
           first_name: "John",
+          id: 123456789,
+          is_premium: true,
+          language_code: "en",
           last_name: "Doe",
           username: "johndoe",
-          language_code: "en",
-          is_premium: true,
         },
-        query_id: "AAE123",
-        chat_type: "private",
-        auth_date: 1234567890,
-        hash: "abc123",
       };
 
       expect(validateMiniAppData(data)).toBe(true);
@@ -861,12 +882,12 @@ describe("validateMiniAppData", () => {
 
     it("should return false for invalid user object", () => {
       const data = {
+        auth_date: 1234567890,
+        hash: "abc123",
         user: {
           // Missing id and first_name
           username: "johndoe",
         },
-        auth_date: 1234567890,
-        hash: "abc123",
       };
 
       expect(validateMiniAppData(data)).toBe(false);
@@ -874,12 +895,12 @@ describe("validateMiniAppData", () => {
 
     it("should return false when user.id is string", () => {
       const data = {
-        user: {
-          id: "123456789",
-          first_name: "John",
-        },
         auth_date: 1234567890,
         hash: "abc123",
+        user: {
+          first_name: "John",
+          id: "123456789",
+        },
       };
 
       expect(validateMiniAppData(data)).toBe(false);

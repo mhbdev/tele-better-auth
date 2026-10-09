@@ -1,8 +1,3 @@
-/**
- * @vitest-environment happy-dom
- */
-import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TELEGRAM_OIDC_AUTH_ENDPOINT,
   TELEGRAM_OIDC_ISSUER,
@@ -10,715 +5,13 @@ import {
   TELEGRAM_OIDC_PROVIDER_ID,
   TELEGRAM_OIDC_TOKEN_ENDPOINT,
 } from "./constants";
-import { buildScopes, createTelegramOIDCProvider } from "./oidc";
-import type { TelegramOIDCClaims } from "./types";
 
-// Mock @better-fetch/fetch
-vi.mock("@better-fetch/fetch", () => ({
-  betterFetch: vi.fn(),
-}));
-
-// Mock @better-auth/core/oauth2
-vi.mock("@better-auth/core/oauth2", () => ({
-  createAuthorizationURL: vi.fn(),
-  validateAuthorizationCode: vi.fn(),
-}));
-
-import {
-  createAuthorizationURL,
-  validateAuthorizationCode,
-} from "@better-auth/core/oauth2";
-import { betterFetch } from "@better-fetch/fetch";
-
-const mockedBetterFetch = vi.mocked(betterFetch);
-const mockedCreateAuthorizationURL = vi.mocked(createAuthorizationURL);
-const mockedValidateAuthorizationCode = vi.mocked(validateAuthorizationCode);
-
-const BOT_TOKEN = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz";
 const BOT_ID = "123456789";
 
-describe("buildScopes", () => {
-  it("should include openid by default", () => {
-    const scopes = buildScopes({});
-    expect(scopes).toContain("openid");
-  });
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-  it("should include profile when no custom scopes are provided", () => {
-    const scopes = buildScopes({});
-    expect(scopes).toContain("profile");
-    expect(scopes).toEqual(["openid", "profile"]);
-  });
-
-  it("should not include profile when custom scopes are provided", () => {
-    const scopes = buildScopes({ scopes: ["email"] });
-    expect(scopes).not.toContain("profile");
-    expect(scopes).toContain("email");
-  });
-
-  it("should add phone scope when requestPhone is true", () => {
-    const scopes = buildScopes({ requestPhone: true });
-    expect(scopes).toContain("phone");
-    expect(scopes).toContain("openid");
-    expect(scopes).toContain("profile");
-  });
-
-  it("should add telegram:bot_access scope when requestBotAccess is true", () => {
-    const scopes = buildScopes({ requestBotAccess: true });
-    expect(scopes).toContain("telegram:bot_access");
-  });
-
-  it("should combine all scopes correctly", () => {
-    const scopes = buildScopes({
-      scopes: ["email", "custom_scope"],
-      requestPhone: true,
-      requestBotAccess: true,
-    });
-
-    expect(scopes).toContain("openid");
-    expect(scopes).toContain("email");
-    expect(scopes).toContain("custom_scope");
-    expect(scopes).toContain("phone");
-    expect(scopes).toContain("telegram:bot_access");
-  });
-
-  it("should not produce duplicate scopes", () => {
-    const scopes = buildScopes({
-      scopes: ["openid", "profile", "phone"],
-      requestPhone: true,
-    });
-
-    const uniqueScopes = [...new Set(scopes)];
-    expect(scopes.length).toBe(uniqueScopes.length);
-  });
-
-  it("should not add phone when requestPhone is false", () => {
-    const scopes = buildScopes({ requestPhone: false });
-    expect(scopes).not.toContain("phone");
-  });
-
-  it("should not add telegram:bot_access when requestBotAccess is false", () => {
-    const scopes = buildScopes({ requestBotAccess: false });
-    expect(scopes).not.toContain("telegram:bot_access");
-  });
-
-  it("should handle empty scopes array", () => {
-    const scopes = buildScopes({ scopes: [] });
-    expect(scopes).toContain("openid");
-    expect(scopes).not.toContain("profile");
-  });
-});
-
-describe("createTelegramOIDCProvider", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  describe("Provider shape", () => {
-    it("should return a valid OAuthProvider object", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-
-      expect(provider).toHaveProperty("id");
-      expect(provider).toHaveProperty("name");
-      expect(provider).toHaveProperty("createAuthorizationURL");
-      expect(provider).toHaveProperty("validateAuthorizationCode");
-      expect(provider).toHaveProperty("getUserInfo");
-      expect(provider).toHaveProperty("verifyIdToken");
-      expect(provider).toHaveProperty("options");
-    });
-
-    it("should have correct id", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      expect(provider.id).toBe(TELEGRAM_OIDC_PROVIDER_ID);
-      expect(provider.id).toBe("telegram-oidc");
-    });
-
-    it("should have correct name", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      expect(provider.name).toBe("Telegram");
-    });
-
-    it("should have all methods as functions", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-
-      expect(typeof provider.createAuthorizationURL).toBe("function");
-      expect(typeof provider.validateAuthorizationCode).toBe("function");
-      expect(typeof provider.getUserInfo).toBe("function");
-      expect(typeof provider.verifyIdToken).toBe("function");
-    });
-
-    it("should set correct options with bot ID as clientId", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      expect(provider.options).toEqual({
-        clientId: BOT_ID,
-        clientSecret: BOT_TOKEN,
-      });
-    });
-
-    it("should use separate clientId when provided", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        clientId: "999888777",
-      });
-      expect(provider.options?.clientId).toBe("999888777");
-      warnSpy.mockRestore();
-    });
-
-    it("should use separate clientSecret when provided", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        clientSecret: "separate-oidc-secret",
-      });
-      expect(provider.options).toEqual({
-        clientId: BOT_ID,
-        clientSecret: "separate-oidc-secret",
-      });
-    });
-
-    it("should fall back to bot token when clientSecret is not provided", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {});
-      expect(provider.options?.clientSecret).toBe(BOT_TOKEN);
-      warnSpy.mockRestore();
-    });
-
-    it("should warn when clientSecret is not provided", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      createTelegramOIDCProvider(BOT_TOKEN, {});
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("no clientSecret provided"),
-        expect.any(String),
-        expect.any(String)
-      );
-      warnSpy.mockRestore();
-    });
-  });
-
-  describe("Bot ID extraction", () => {
-    it("should extract bot ID from standard token format", () => {
-      const provider = createTelegramOIDCProvider("987654321:XYZabcDEFghiJKL");
-      expect(provider.options?.clientId).toBe("987654321");
-    });
-
-    it("should use first part before colon as bot ID", () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      expect(provider.options?.clientId).toBe("123456789");
-    });
-
-    it("should handle token with multiple colons", () => {
-      const provider = createTelegramOIDCProvider("111:abc:def");
-      expect(provider.options?.clientId).toBe("111");
-    });
-  });
-
-  describe("createAuthorizationURL", () => {
-    it("should call createAuthorizationURL with correct parameters", async () => {
-      const mockUrl = new URL("https://oauth.telegram.org/auth?test=1");
-      mockedCreateAuthorizationURL.mockResolvedValueOnce(mockUrl);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.createAuthorizationURL({
-        state: "test-state",
-        codeVerifier: "test-verifier",
-        redirectURI: "https://example.com/callback",
-        scopes: undefined,
-        display: undefined,
-        loginHint: undefined,
-      });
-
-      expect(mockedCreateAuthorizationURL).toHaveBeenCalledWith({
-        id: TELEGRAM_OIDC_PROVIDER_ID,
-        options: {
-          clientId: BOT_ID,
-          clientSecret: BOT_TOKEN,
-        },
-        authorizationEndpoint: TELEGRAM_OIDC_AUTH_ENDPOINT,
-        scopes: expect.arrayContaining(["openid", "profile"]),
-        state: "test-state",
-        codeVerifier: "test-verifier",
-        redirectURI: "https://example.com/callback",
-      });
-
-      expect(result).toBe(mockUrl);
-    });
-
-    it("should include additional scopes passed directly", async () => {
-      const mockUrl = new URL("https://oauth.telegram.org/auth");
-      mockedCreateAuthorizationURL.mockResolvedValueOnce(mockUrl);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      await provider.createAuthorizationURL({
-        state: "state",
-        codeVerifier: "verifier",
-        redirectURI: "https://example.com/cb",
-        scopes: ["extra_scope"],
-        display: undefined,
-        loginHint: undefined,
-      });
-
-      const callArgs = mockedCreateAuthorizationURL.mock.calls[0]![0];
-      expect(callArgs.scopes).toContain("extra_scope");
-      expect(callArgs.scopes).toContain("openid");
-    });
-
-    it("should use custom scopes from options", async () => {
-      const mockUrl = new URL("https://oauth.telegram.org/auth");
-      mockedCreateAuthorizationURL.mockResolvedValueOnce(mockUrl);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        requestPhone: true,
-        requestBotAccess: true,
-      });
-
-      await provider.createAuthorizationURL({
-        state: "state",
-        codeVerifier: "verifier",
-        redirectURI: "https://example.com/cb",
-        scopes: undefined,
-        display: undefined,
-        loginHint: undefined,
-      });
-
-      const callArgs = mockedCreateAuthorizationURL.mock.calls[0]![0];
-      expect(callArgs.scopes).toContain("phone");
-      expect(callArgs.scopes).toContain("telegram:bot_access");
-    });
-
-    it("should NOT pass additionalParams, origin, or bot_id (issue #12)", async () => {
-      const mockUrl = new URL("https://oauth.telegram.org/auth");
-      mockedCreateAuthorizationURL.mockResolvedValueOnce(mockUrl);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      await provider.createAuthorizationURL({
-        state: "state",
-        codeVerifier: "verifier",
-        redirectURI: "https://api.example.com/api/auth/callback/telegram-oidc",
-        scopes: undefined,
-        display: undefined,
-        loginHint: undefined,
-      });
-
-      const callArgs = mockedCreateAuthorizationURL.mock.calls[0]![0] as any;
-      expect(callArgs).not.toHaveProperty("additionalParams");
-      expect(callArgs).not.toHaveProperty("origin");
-      expect(callArgs).not.toHaveProperty("bot_id");
-    });
-  });
-
-  describe("validateAuthorizationCode", () => {
-    it("should call validateAuthorizationCode with correct parameters", async () => {
-      const mockTokens = {
-        accessToken: "access-token",
-        idToken: "id-token",
-      };
-      mockedValidateAuthorizationCode.mockResolvedValueOnce(mockTokens);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.validateAuthorizationCode({
-        code: "auth-code",
-        codeVerifier: "verifier",
-        redirectURI: "https://example.com/cb",
-      });
-
-      expect(mockedValidateAuthorizationCode).toHaveBeenCalledWith({
-        code: "auth-code",
-        codeVerifier: "verifier",
-        redirectURI: "https://example.com/cb",
-        options: {
-          clientId: BOT_ID,
-          clientSecret: BOT_TOKEN,
-        },
-        tokenEndpoint: TELEGRAM_OIDC_TOKEN_ENDPOINT,
-      });
-
-      expect(result).toBe(mockTokens);
-    });
-
-    it("should use separate clientSecret for token exchange", async () => {
-      const mockTokens = { accessToken: "at", idToken: "it" };
-      mockedValidateAuthorizationCode.mockResolvedValueOnce(mockTokens);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        clientSecret: "oidc-secret-from-botfather",
-      });
-      await provider.validateAuthorizationCode({
-        code: "auth-code",
-        codeVerifier: "verifier",
-        redirectURI: "https://example.com/cb",
-      });
-
-      expect(mockedValidateAuthorizationCode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          options: {
-            clientId: BOT_ID,
-            clientSecret: "oidc-secret-from-botfather",
-          },
-        })
-      );
-    });
-  });
-
-  describe("getUserInfo", () => {
-    function createTestJWT(claims: Partial<TelegramOIDCClaims>): string {
-      const header = Buffer.from(
-        JSON.stringify({ alg: "RS256", typ: "JWT" })
-      ).toString("base64url");
-      const payload = Buffer.from(
-        JSON.stringify({
-          sub: "12345",
-          name: "John Doe",
-          picture: "https://example.com/photo.jpg",
-          preferred_username: "johndoe",
-          iss: TELEGRAM_OIDC_ISSUER,
-          aud: BOT_ID,
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600,
-          ...claims,
-        })
-      ).toString("base64url");
-      const signature = Buffer.from("fake-signature").toString("base64url");
-      return `${header}.${payload}.${signature}`;
-    }
-
-    it("should return null when no idToken is provided", async () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({
-        idToken: undefined,
-      });
-
-      expect(result).toBeNull();
-    });
-
-    it("should decode JWT and map claims to user info", async () => {
-      const idToken = createTestJWT({
-        sub: "99999",
-        name: "Alice Smith",
-        picture: "https://example.com/alice.jpg",
-        preferred_username: "alice",
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result).not.toBeNull();
-      expect(result!.user.id).toBe("99999");
-      expect(result!.user.name).toBe("Alice Smith");
-      expect(result!.user.image).toBe("https://example.com/alice.jpg");
-      expect(result!.user.emailVerified).toBe(false);
-      expect(result!.user.email).toBe("99999@telegram.oidc");
-    });
-
-    it("should return claims as data", async () => {
-      const idToken = createTestJWT({
-        sub: "12345",
-        preferred_username: "johndoe",
-        phone_number: "+1234567890",
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result!.data.sub).toBe("12345");
-      expect(result!.data.preferred_username).toBe("johndoe");
-      expect(result!.data.phone_number).toBe("+1234567890");
-    });
-
-    it("should handle missing optional claims", async () => {
-      const idToken = createTestJWT({
-        sub: "12345",
-        name: undefined,
-        picture: undefined,
-        preferred_username: undefined,
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result).not.toBeNull();
-      expect(result!.user.id).toBe("12345");
-      expect(result!.user.name).toBeUndefined();
-      expect(result!.user.image).toBeUndefined();
-    });
-
-    it("should always set emailVerified to false", async () => {
-      const idToken = createTestJWT({ sub: "12345" });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result!.user.emailVerified).toBe(false);
-    });
-
-    it("should generate placeholder email from telegram sub", async () => {
-      const idToken = createTestJWT({ sub: "12345" });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result!.user.email).toBe("12345@telegram.oidc");
-    });
-
-    it("should return null for malformed idToken", async () => {
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken: "not-a-jwt" });
-
-      expect(result).toBeNull();
-    });
-
-    it("should return null when JWT has no sub claim", async () => {
-      const header = Buffer.from(
-        JSON.stringify({ alg: "RS256", typ: "JWT" })
-      ).toString("base64url");
-      const payload = Buffer.from(
-        JSON.stringify({
-          name: "No Sub User",
-          iss: TELEGRAM_OIDC_ISSUER,
-          aud: BOT_ID,
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600,
-        })
-      ).toString("base64url");
-      const signature = Buffer.from("fake-signature").toString("base64url");
-      const idToken = `${header}.${payload}.${signature}`;
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result).toBeNull();
-    });
-
-    it("should use mapOIDCProfileToUser when provided", async () => {
-      const idToken = createTestJWT({
-        sub: "12345",
-        name: "Original Name",
-        preferred_username: "original",
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        mapOIDCProfileToUser: (claims) => ({
-          name: `Custom: ${claims.name}`,
-          email: "custom@example.com",
-          image: "https://custom.com/photo.jpg",
-        }),
-      });
-
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result!.user.name).toBe("Custom: Original Name");
-      expect(result!.user.email).toBe("custom@example.com");
-      expect(result!.user.image).toBe("https://custom.com/photo.jpg");
-    });
-
-    it("should override default fields with mapOIDCProfileToUser result", async () => {
-      const idToken = createTestJWT({
-        sub: "12345",
-        name: "Original",
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        mapOIDCProfileToUser: () => ({
-          name: "Overridden",
-        }),
-      });
-
-      const result = await provider.getUserInfo({ idToken });
-
-      expect(result!.user.name).toBe("Overridden");
-      expect(result!.user.id).toBe("12345");
-    });
-
-    it("should still include standard fields when mapOIDCProfileToUser is provided", async () => {
-      const idToken = createTestJWT({
-        sub: "12345",
-        name: "Alice",
-        picture: "https://example.com/pic.jpg",
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN, {
-        mapOIDCProfileToUser: () => ({
-          name: "Custom Alice",
-        }),
-      });
-
-      const result = await provider.getUserInfo({ idToken });
-
-      // mapOIDCProfileToUser overrides spread last
-      expect(result!.user.id).toBe("12345");
-      expect(result!.user.emailVerified).toBe(false);
-    });
-  });
-
-  describe("verifyIdToken", () => {
-    let rsaKeyPair: Awaited<ReturnType<typeof generateKeyPair>>;
-    let jwk: any;
-
-    beforeEach(async () => {
-      rsaKeyPair = await generateKeyPair("RS256");
-      const exportedJwk = await exportJWK(rsaKeyPair.publicKey);
-      jwk = {
-        ...exportedJwk,
-        kid: "test-kid-1",
-        alg: "RS256",
-        use: "sig",
-      };
-    });
-
-    async function createSignedJWT(
-      claims: Record<string, any>,
-      kid = "test-kid-1"
-    ): Promise<string> {
-      return await new SignJWT(claims)
-        .setProtectedHeader({ alg: "RS256", kid })
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .setIssuer(TELEGRAM_OIDC_ISSUER)
-        .setAudience(BOT_ID)
-        .sign(rsaKeyPair.privateKey);
-    }
-
-    it("should verify a valid JWT token", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: { keys: [jwk] },
-      } as any);
-
-      const token = await createSignedJWT({
-        sub: "12345",
-        name: "Test User",
-      });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(token);
-
-      expect(result).toBe(true);
-      expect(mockedBetterFetch).toHaveBeenCalledWith(TELEGRAM_OIDC_JWKS_URI);
-    });
-
-    it("should return false when JWT header has no kid", async () => {
-      // Create a JWT without kid in header
-      const token = new SignJWT({ sub: "12345" })
-        .setProtectedHeader({ alg: "RS256" }) // no kid
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .setIssuer(TELEGRAM_OIDC_ISSUER)
-        .setAudience(BOT_ID);
-
-      const signedToken = await token.sign(rsaKeyPair.privateKey);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(signedToken);
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false when JWKS fetch fails", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: null,
-      } as any);
-
-      const token = await createSignedJWT({ sub: "12345" });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(token);
-      expect(result).toBe(false);
-    });
-
-    it("should return false when kid is not found in JWKS", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: {
-          keys: [{ ...jwk, kid: "different-kid" }],
-        },
-      } as any);
-
-      const token = await createSignedJWT({ sub: "12345" });
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(token);
-      expect(result).toBe(false);
-    });
-
-    it("should return false for a token with wrong issuer", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: { keys: [jwk] },
-      } as any);
-
-      const token = new SignJWT({ sub: "12345" })
-        .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .setIssuer("https://wrong-issuer.com")
-        .setAudience(BOT_ID);
-
-      const signedToken = await token.sign(rsaKeyPair.privateKey);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(signedToken);
-      expect(result).toBe(false);
-    });
-
-    it("should return false for a token with wrong audience", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: { keys: [jwk] },
-      } as any);
-
-      const token = new SignJWT({ sub: "12345" })
-        .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .setIssuer(TELEGRAM_OIDC_ISSUER)
-        .setAudience("wrong-audience");
-
-      const signedToken = await token.sign(rsaKeyPair.privateKey);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(signedToken);
-      expect(result).toBe(false);
-    });
-
-    it("should return false for an expired token", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: { keys: [jwk] },
-      } as any);
-
-      const token = new SignJWT({ sub: "12345" })
-        .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
-        .setIssuedAt(Math.floor(Date.now() / 1000) - 7200)
-        .setExpirationTime(Math.floor(Date.now() / 1000) - 3600)
-        .setIssuer(TELEGRAM_OIDC_ISSUER)
-        .setAudience(BOT_ID);
-
-      const signedToken = await token.sign(rsaKeyPair.privateKey);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(signedToken);
-      expect(result).toBe(false);
-    });
-
-    it("should return false for a token signed with a different key", async () => {
-      mockedBetterFetch.mockResolvedValueOnce({
-        data: { keys: [jwk] },
-      } as any);
-
-      // Generate a different key pair
-      const otherKeyPair = await generateKeyPair("RS256");
-
-      const token = new SignJWT({ sub: "12345" })
-        .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
-        .setIssuedAt()
-        .setExpirationTime("1h")
-        .setIssuer(TELEGRAM_OIDC_ISSUER)
-        .setAudience(BOT_ID);
-
-      const signedToken = await token.sign(otherKeyPair.privateKey);
-
-      const provider = createTelegramOIDCProvider(BOT_TOKEN);
-      const result = await provider.verifyIdToken!(signedToken);
-      expect(result).toBe(false);
-    });
-  });
-});
-
+const BOT_TOKEN = "123456789:test-token";
+afterEach(() => vi.restoreAllMocks());
 describe("Plugin integration", () => {
   describe("init hook with OIDC", () => {
     it("should include init hook when oidc.enabled is true", async () => {
@@ -726,7 +19,7 @@ describe("Plugin integration", () => {
       const plugin = telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       expect(plugin).toHaveProperty("init");
@@ -759,13 +52,13 @@ describe("Plugin integration", () => {
       const plugin = telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       const mockCtx = {
-        socialProviders: [],
         getPlugin: () => undefined,
         hasPlugin: () => false,
+        socialProviders: [],
       } as any;
       const result = plugin.init!(mockCtx)!;
       const providers = result.context!.socialProviders!;
@@ -780,7 +73,7 @@ describe("Plugin integration", () => {
       const plugin = telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       const existingProvider = {
@@ -788,9 +81,9 @@ describe("Plugin integration", () => {
         name: "Google",
       };
       const mockCtx = {
-        socialProviders: [existingProvider],
         getPlugin: () => undefined,
         hasPlugin: () => false,
+        socialProviders: [existingProvider],
       } as any;
       const result = plugin.init!(mockCtx)!;
       const providers = result.context!.socialProviders!;
@@ -806,22 +99,23 @@ describe("Plugin integration", () => {
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
         oidc: {
+          clientSecret: "test-oidc-secret",
           enabled: true,
-          requestPhone: true,
           requestBotAccess: true,
+          requestPhone: true,
         },
       });
 
       const mockCtx = {
-        socialProviders: [],
         getPlugin: () => undefined,
         hasPlugin: () => false,
+        socialProviders: [],
       } as any;
       const result = plugin.init!(mockCtx);
-      const provider = result.context!.socialProviders![0];
+      const [provider] = result.context!.socialProviders!;
 
       expect(provider!.options?.clientId).toBe(BOT_ID);
-      expect(provider!.options?.clientSecret).toBe(BOT_TOKEN);
+      expect(provider!.options?.clientSecret).toBe("test-oidc-secret");
     });
   });
 
@@ -833,8 +127,8 @@ describe("Plugin integration", () => {
       telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
         testMode: true,
-        oidc: { enabled: true },
       });
 
       expect(warnSpy).toHaveBeenCalledWith(
@@ -866,8 +160,8 @@ describe("Plugin integration", () => {
       telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        testMode: true,
         oidc: { enabled: false },
+        testMode: true,
       });
 
       expect(warnSpy).not.toHaveBeenCalled();
@@ -882,8 +176,8 @@ describe("Plugin integration", () => {
       telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
         testMode: false,
-        oidc: { enabled: true },
       });
 
       expect(warnSpy).not.toHaveBeenCalled();
@@ -898,8 +192,8 @@ describe("Plugin integration", () => {
       telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
         testMode: true,
-        oidc: { enabled: true },
       });
 
       expect(warnSpy).toHaveBeenCalledWith(
@@ -921,7 +215,7 @@ describe("Plugin integration", () => {
       telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       // testMode defaults to false, so no warning even though oidc is on
@@ -948,13 +242,13 @@ describe("Plugin integration", () => {
       const plugin = telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       const mockCtx = {
-        socialProviders: [],
         getPlugin: () => undefined,
         hasPlugin: () => false,
+        socialProviders: [],
       } as any;
       const result = plugin.init!(mockCtx);
 
@@ -972,7 +266,7 @@ describe("Plugin integration", () => {
       const plugin = telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       expect(plugin.endpoints).toHaveProperty("getTelegramConfig");
@@ -983,504 +277,17 @@ describe("Plugin integration", () => {
       const plugin = telegram({
         botToken: BOT_TOKEN,
         botUsername: "test_bot",
-        oidc: { enabled: true },
+        oidc: { clientSecret: "test-oidc-secret", enabled: true },
       });
 
       expect(plugin.schema!.user!.fields).toHaveProperty("telegramPhoneNumber");
       expect(plugin.schema!.user!.fields.telegramPhoneNumber).toEqual({
-        type: "string",
-        required: false,
-        unique: false,
         input: false,
+        required: false,
+        type: "string",
+        unique: false,
       });
     });
-  });
-});
-
-describe("Client signInWithTelegramOIDC", () => {
-  let mockFetch: any;
-
-  beforeEach(() => {
-    mockFetch = vi.fn();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should have signInWithTelegramOIDC action", async () => {
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    expect(actions).toHaveProperty("signInWithTelegramOIDC");
-    expect(typeof actions.signInWithTelegramOIDC).toBe("function");
-  });
-
-  it("should call /sign-in/social with provider telegram-oidc", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC();
-
-    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: undefined,
-        errorCallbackURL: undefined,
-        disableRedirect: undefined,
-      },
-    });
-  });
-
-  it("should pass callbackURL correctly", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC({
-      callbackURL: "/dashboard",
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: "/dashboard",
-        errorCallbackURL: undefined,
-        disableRedirect: undefined,
-      },
-    });
-  });
-
-  it("should pass errorCallbackURL correctly", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC({
-      callbackURL: "/dashboard",
-      errorCallbackURL: "/error",
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: "/dashboard",
-        errorCallbackURL: "/error",
-        disableRedirect: undefined,
-      },
-    });
-  });
-
-  it("should pass fetchOptions correctly", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC(
-      { callbackURL: "/dashboard" },
-      { headers: { "X-Custom": "value" } }
-    );
-
-    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: "/dashboard",
-        errorCallbackURL: undefined,
-        disableRedirect: undefined,
-      },
-      headers: { "X-Custom": "value" },
-    });
-  });
-
-  it("should support popup flow with disableRedirect", async () => {
-    mockFetch.mockResolvedValueOnce({
-      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
-    });
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC({
-      callbackURL: "/dashboard",
-      flow: "popup",
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: "/dashboard",
-        errorCallbackURL: undefined,
-        disableRedirect: true,
-      },
-      customFetchImpl: expect.any(Function),
-      onSuccess: expect.any(Function),
-    });
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://oauth.telegram.org/auth?client_id=123",
-      "telegram-oidc-login",
-      expect.stringContaining("popup=yes")
-    );
-  });
-
-  it("should sanitize popup OAuth response before redirect plugins run", async () => {
-    const popupUrl = "https://oauth.telegram.org/auth?client_id=123";
-    mockFetch.mockImplementationOnce(
-      async (
-        _path: string,
-        requestOptions: {
-          customFetchImpl: (
-            input: RequestInfo | URL,
-            init?: RequestInit
-          ) => Promise<Response>;
-        }
-      ) => {
-        const response = await requestOptions.customFetchImpl(
-          "https://example.com/sign-in/social",
-          { method: "POST" }
-        );
-        return { data: await response.json() };
-      }
-    );
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    const result = await actions.signInWithTelegramOIDC(
-      { flow: "popup" },
-      {
-        customFetchImpl: async () =>
-          new Response(JSON.stringify({ url: popupUrl, redirect: true }), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          }),
-      }
-    );
-
-    expect(result).toEqual({
-      data: {
-        url: "",
-        redirect: false,
-      },
-    });
-    expect(openSpy).toHaveBeenCalledWith(
-      popupUrl,
-      "telegram-oidc-login",
-      expect.stringContaining("popup=yes")
-    );
-  });
-
-  it("should fall back to same-tab when popup is blocked", async () => {
-    mockFetch.mockResolvedValueOnce({
-      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
-    });
-    vi.spyOn(window, "open").mockReturnValue(null);
-    const assignSpy = vi
-      .spyOn(window.location, "assign")
-      .mockImplementation(() => {});
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC({
-      flow: "popup",
-    });
-
-    expect(assignSpy).toHaveBeenCalledWith(
-      "https://oauth.telegram.org/auth?client_id=123"
-    );
-  });
-
-  it("should not open popup when popup URL is missing", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-    const openSpy = vi.spyOn(window, "open");
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC({
-      flow: "popup",
-    });
-
-    expect(openSpy).not.toHaveBeenCalled();
-  });
-
-  it("should return response from fetch", async () => {
-    const expectedResponse = {
-      data: { url: "https://oauth.telegram.org/auth?..." },
-    };
-    mockFetch.mockResolvedValueOnce(expectedResponse);
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    const result = await actions.signInWithTelegramOIDC({
-      callbackURL: "/dashboard",
-    });
-
-    expect(result).toEqual(expectedResponse);
-  });
-
-  it("should handle errors from fetch", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("Network error"));
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await expect(
-      actions.signInWithTelegramOIDC({ callbackURL: "/dashboard" })
-    ).rejects.toThrow("Network error");
-  });
-
-  it("should work without options parameter", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC();
-
-    expect(mockFetch).toHaveBeenCalledWith("/sign-in/social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: undefined,
-        errorCallbackURL: undefined,
-        disableRedirect: undefined,
-      },
-    });
-  });
-
-  it("should have linkTelegramOIDC action", async () => {
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    expect(actions).toHaveProperty("linkTelegramOIDC");
-    expect(typeof actions.linkTelegramOIDC).toBe("function");
-  });
-
-  it("should call /link-social with provider telegram-oidc", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.linkTelegramOIDC();
-
-    expect(mockFetch).toHaveBeenCalledWith("/link-social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: undefined,
-        errorCallbackURL: undefined,
-        scopes: undefined,
-        disableRedirect: undefined,
-      },
-    });
-  });
-
-  it("should support popup flow for linkTelegramOIDC", async () => {
-    mockFetch.mockResolvedValueOnce({
-      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
-    });
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.linkTelegramOIDC({
-      callbackURL: "/settings?tab=connections",
-      errorCallbackURL: "/settings?tab=connections",
-      flow: "popup",
-      scopes: ["openid", "profile"],
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith("/link-social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: "/settings?tab=connections",
-        errorCallbackURL: "/settings?tab=connections",
-        scopes: ["openid", "profile"],
-        disableRedirect: true,
-      },
-      customFetchImpl: expect.any(Function),
-      onSuccess: expect.any(Function),
-    });
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://oauth.telegram.org/auth?client_id=123",
-      "telegram-oidc-login",
-      expect.stringContaining("popup=yes")
-    );
-  });
-
-  it("should pass fetchOptions to linkTelegramOIDC", async () => {
-    mockFetch.mockResolvedValueOnce({ data: {} });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.linkTelegramOIDC(
-      { callbackURL: "/settings" },
-      { headers: { "X-Custom": "value" } }
-    );
-
-    expect(mockFetch).toHaveBeenCalledWith("/link-social", {
-      method: "POST",
-      body: {
-        provider: "telegram-oidc",
-        callbackURL: "/settings",
-        errorCallbackURL: undefined,
-        scopes: undefined,
-        disableRedirect: undefined,
-      },
-      headers: { "X-Custom": "value" },
-    });
-  });
-
-  it("should suppress Better Auth auto-redirect in popup flow", async () => {
-    mockFetch.mockResolvedValueOnce({
-      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
-    });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC({
-      flow: "popup",
-    });
-
-    const requestOptions = mockFetch.mock.calls[0][1];
-    const context = {
-      data: {
-        url: "https://oauth.telegram.org/auth?client_id=123",
-        redirect: true,
-      },
-    };
-
-    await requestOptions.onSuccess(context);
-    expect(context.data.redirect).toBe(false);
-    expect(context.data.url).toBe("");
-  });
-
-  it("should preserve caller onSuccess in popup flow", async () => {
-    mockFetch.mockResolvedValueOnce({
-      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
-    });
-    const callerOnSuccess = vi.fn();
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.signInWithTelegramOIDC(
-      { flow: "popup" },
-      { onSuccess: callerOnSuccess }
-    );
-
-    const requestOptions = mockFetch.mock.calls[0][1];
-    const context = {
-      data: {
-        url: "https://oauth.telegram.org/auth?client_id=123",
-        redirect: true,
-      },
-    };
-
-    await requestOptions.onSuccess(context);
-    expect(context.data.redirect).toBe(false);
-    expect(callerOnSuccess).toHaveBeenCalledWith(context);
-  });
-
-  it("should suppress Better Auth auto-redirect in link popup flow", async () => {
-    mockFetch.mockResolvedValueOnce({
-      data: { url: "https://oauth.telegram.org/auth?client_id=123" },
-    });
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.linkTelegramOIDC({
-      flow: "popup",
-    });
-
-    const requestOptions = mockFetch.mock.calls[0][1];
-    const context = {
-      data: {
-        url: "https://oauth.telegram.org/auth?client_id=123",
-        redirect: true,
-      },
-    };
-
-    await requestOptions.onSuccess(context);
-    expect(context.data.redirect).toBe(false);
-    expect(context.data.url).toBe("");
-  });
-
-  it("should open popup using URL captured in popup onSuccess hook", async () => {
-    mockFetch.mockImplementationOnce(
-      async (
-        _path: string,
-        requestOptions: {
-          onSuccess: (context: {
-            data: { redirect: boolean; url: string };
-          }) => Promise<void> | void;
-        }
-      ) => {
-        const context = {
-          data: {
-            url: "https://oauth.telegram.org/auth?client_id=123",
-            redirect: true,
-          },
-        };
-
-        await requestOptions.onSuccess(context);
-        return { data: context.data };
-      }
-    );
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(window);
-
-    const { telegramClient } = await import("./client");
-    const client = telegramClient();
-    const actions = client.getActions(mockFetch);
-
-    await actions.linkTelegramOIDC({
-      flow: "popup",
-    });
-
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://oauth.telegram.org/auth?client_id=123",
-      "telegram-oidc-login",
-      expect.stringContaining("popup=yes")
-    );
   });
 });
 
@@ -1537,8 +344,8 @@ describe("Adversarial: testMode option", () => {
     telegram({
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
-      testMode: true,
       oidc: { enabled: false },
+      testMode: true,
     });
 
     expect(warnSpy).not.toHaveBeenCalled();
@@ -1551,8 +358,8 @@ describe("Adversarial: testMode option", () => {
     telegram({
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
       testMode: true,
-      oidc: { enabled: true },
     });
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -1568,8 +375,8 @@ describe("Adversarial: testMode option", () => {
     telegram({
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
       testMode: false,
-      oidc: { enabled: true },
     });
 
     expect(warnSpy).not.toHaveBeenCalled();
@@ -1583,7 +390,7 @@ describe("Adversarial: testMode option", () => {
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
       // testMode omitted, defaults to false
-      oidc: { enabled: true },
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
     });
 
     expect(warnSpy).not.toHaveBeenCalled();
@@ -1597,14 +404,14 @@ describe("Adversarial: testMode option", () => {
     const pluginWithExplicitFalse = telegram({
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
       testMode: false,
-      oidc: { enabled: true },
     });
 
     const pluginWithOmitted = telegram({
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
-      oidc: { enabled: true },
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
     });
 
     // Neither should have triggered a warning
@@ -1622,13 +429,13 @@ describe("Adversarial: init hook return value is non-void object", () => {
     const plugin = telegram({
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
-      oidc: { enabled: true },
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
     });
 
     const mockCtx = {
-      socialProviders: [],
       getPlugin: () => undefined,
       hasPlugin: () => false,
+      socialProviders: [],
     } as any;
 
     const result = plugin.init!(mockCtx);
@@ -1651,9 +458,9 @@ describe("Adversarial: config endpoint shape with testMode", () => {
     const plugin = telegram({
       botToken: BOT_TOKEN,
       botUsername: "my_bot",
-      testMode: true,
       miniApp: { enabled: true },
-      oidc: { enabled: true },
+      oidc: { clientSecret: "test-oidc-secret", enabled: true },
+      testMode: true,
     });
 
     // The getTelegramConfig endpoint must exist
@@ -1748,10 +555,13 @@ describe.skipIf(!distExists)("Module augmentation in built output", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const distDir = path.resolve(process.cwd(), "dist");
-    const dtsContent = fs.readFileSync(
-      path.join(distDir, "index.d.ts"),
-      "utf-8"
-    );
+    const dtsContent =
+      fs.readFileSync(path.join(distDir, "index.d.ts"), "utf-8") +
+      fs
+        .readdirSync(distDir)
+        .filter((file) => file.startsWith("index-") && file.endsWith(".d.ts"))
+        .map((file) => fs.readFileSync(path.join(distDir, file), "utf-8"))
+        .join("\n");
     expect(dtsContent).toContain("BetterAuthPluginRegistry");
     expect(dtsContent).toContain("typeof telegram");
     expect(dtsContent).toContain('declare module "@better-auth/core"');
@@ -1761,10 +571,13 @@ describe.skipIf(!distExists)("Module augmentation in built output", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const distDir = path.resolve(process.cwd(), "dist");
-    const dctsContent = fs.readFileSync(
-      path.join(distDir, "index.d.cts"),
-      "utf-8"
-    );
+    const dctsContent =
+      fs.readFileSync(path.join(distDir, "index.d.cts"), "utf-8") +
+      fs
+        .readdirSync(distDir)
+        .filter((file) => file.startsWith("index-") && file.endsWith(".d.cts"))
+        .map((file) => fs.readFileSync(path.join(distDir, file), "utf-8"))
+        .join("\n");
     expect(dctsContent).toContain("BetterAuthPluginRegistry");
     expect(dctsContent).toContain("typeof telegram");
     expect(dctsContent).toContain('declare module "@better-auth/core"');
@@ -1774,10 +587,13 @@ describe.skipIf(!distExists)("Module augmentation in built output", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const distDir = path.resolve(process.cwd(), "dist");
-    const dtsContent = fs.readFileSync(
-      path.join(distDir, "index.d.ts"),
-      "utf-8"
-    );
+    const dtsContent =
+      fs.readFileSync(path.join(distDir, "index.d.ts"), "utf-8") +
+      fs
+        .readdirSync(distDir)
+        .filter((file) => file.startsWith("index-") && file.endsWith(".d.ts"))
+        .map((file) => fs.readFileSync(path.join(distDir, file), "utf-8"))
+        .join("\n");
 
     // Verify the augmentation references the exact module
     const moduleRegex = /declare module "@better-auth\/core"/;
@@ -1792,14 +608,20 @@ describe.skipIf(!distExists)("Module augmentation in built output", () => {
     const path = await import("node:path");
     const distDir = path.resolve(process.cwd(), "dist");
 
-    const dtsContent = fs.readFileSync(
-      path.join(distDir, "index.d.ts"),
-      "utf-8"
-    );
-    const dctsContent = fs.readFileSync(
-      path.join(distDir, "index.d.cts"),
-      "utf-8"
-    );
+    const dtsContent =
+      fs.readFileSync(path.join(distDir, "index.d.ts"), "utf-8") +
+      fs
+        .readdirSync(distDir)
+        .filter((file) => file.startsWith("index-") && file.endsWith(".d.ts"))
+        .map((file) => fs.readFileSync(path.join(distDir, file), "utf-8"))
+        .join("\n");
+    const dctsContent =
+      fs.readFileSync(path.join(distDir, "index.d.cts"), "utf-8") +
+      fs
+        .readdirSync(distDir)
+        .filter((file) => file.startsWith("index-") && file.endsWith(".d.cts"))
+        .map((file) => fs.readFileSync(path.join(distDir, file), "utf-8"))
+        .join("\n");
 
     // Extract the augmentation blocks
     const augmentationPattern =

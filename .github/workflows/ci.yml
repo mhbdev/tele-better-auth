@@ -1,114 +1,57 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
+permissions:
+  contents: read
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  test:
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "linux", "x64", "vps"]') }}
-    strategy:
-      matrix:
-        node-version: [22.x, 24.x]
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Type check
-        run: npm run type-check
-
-      - name: Run tests with coverage
-        run: npm run test:coverage
-
-      - name: Upload coverage
-        if: matrix.node-version == '22.x'
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  test-bun:
+  example:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Type check
-        run: bun run type-check
-
-      - name: Run tests
-        run: bun run test
-
-  build:
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "linux", "x64", "vps"]') }}
-    needs: [test, test-bun]
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Node.js 22.x
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22.x
+          node-version: 24
           cache: npm
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build
-        run: npm run build
-
-      - name: Verify dist artifacts
-        run: |
-          echo "## Build Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-          for f in dist/index.js dist/index.cjs dist/index.d.ts dist/index.d.cts \
-                   dist/client.js dist/client.cjs dist/client.d.ts dist/client.d.cts; do
-            test -f "$f" || { echo "::error::Missing artifact: $f"; exit 1; }
-            SIZE=$(wc -c < "$f" | tr -d ' ')
-            echo "| $f | ${SIZE}B |" >> $GITHUB_STEP_SUMMARY
-          done
-
-  lint:
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "linux", "x64", "vps"]') }}
-
+          cache-dependency-path: |
+            package-lock.json
+            test/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci --prefix test
+      - run: npm run db:generate --prefix test
+      - run: npm run type-check --prefix test
+      - run: npm run build --prefix test
+        env:
+          TELEGRAM_BOT_TOKEN: "123456789:ci-placeholder"
+          TELEGRAM_BOT_USERNAME: ci_test_bot
+          BETTER_AUTH_SECRET: ci-only-placeholder-secret-of-at-least-32-characters
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Node.js 22.x
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: ${{ matrix.node }}
           cache: npm
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Lint
-        run: npm run lint
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run build
+      - run: npm run test:coverage
+      - run: npm run check:package
+      - run: npm audit --omit=dev --audit-level=moderate
+      - uses: actions/upload-artifact@v7
+        if: matrix.node == 24
+        with:
+          name: coverage
+          path: coverage/lcov.info

@@ -30,11 +30,13 @@ vi.mock("better-auth/api", () => {
   }
 
   return {
+    APIError: MockAPIError,
     createAuthEndpoint: vi.fn(
       (_path: string, _options: any, handler: any) => handler
     ),
+    createAuthMiddleware: (handler: any) => handler,
+    freshSessionMiddleware: {},
     sessionMiddleware: {},
-    APIError: MockAPIError,
   };
 });
 
@@ -43,11 +45,11 @@ vi.mock("better-auth/cookies", () => ({
 }));
 
 vi.mock("./verify", () => ({
-  verifyTelegramAuth: vi.fn(),
-  verifyMiniAppInitData: vi.fn(),
-  validateTelegramAuthData: vi.fn(),
-  validateMiniAppData: vi.fn(),
   parseMiniAppInitData: vi.fn(),
+  validateMiniAppData: vi.fn(),
+  validateTelegramAuthData: vi.fn(),
+  verifyMiniAppInitData: vi.fn(),
+  verifyTelegramAuth: vi.fn(),
 }));
 
 import {
@@ -75,14 +77,25 @@ const TELEGRAM_USER_ID = "830000001";
  */
 function createOIDCUserAdapter() {
   const oidcUser = {
+    email: `${TELEGRAM_USER_ID}@telegram.oidc`,
     id: "user-oidc-123",
     name: "Tom Robak",
-    email: `${TELEGRAM_USER_ID}@telegram.oidc`,
     telegramId: TELEGRAM_USER_ID,
     telegramUsername: "tomrobak",
   };
 
   return {
+    create: vi.fn(({ model }: any) => {
+      if (model === "user") {
+        // This is the P2002. If the code reaches here, the bug is alive.
+        throw new Error(
+          "PrismaClientKnownRequestError P2002: Unique constraint failed on email"
+        );
+      }
+      // Account creation is fine — that's the fix linking the new provider
+      return Promise.resolve({ id: "new-account-id" });
+    }),
+    delete: vi.fn(),
     findOne: vi.fn(({ model, where }: any) => {
       if (model === "account") {
         // Only a telegram-oidc account exists, NOT a telegram account.
@@ -107,19 +120,7 @@ function createOIDCUserAdapter() {
       return Promise.resolve(null);
     }),
 
-    create: vi.fn(({ model }: any) => {
-      if (model === "user") {
-        // This is the P2002. If the code reaches here, the bug is alive.
-        throw new Error(
-          "PrismaClientKnownRequestError P2002: Unique constraint failed on email"
-        );
-      }
-      // Account creation is fine — that's the fix linking the new provider
-      return Promise.resolve({ id: "new-account-id" });
-    }),
-
     update: vi.fn(),
-    delete: vi.fn(),
   };
 }
 
@@ -129,10 +130,44 @@ function createMockContext(adapter: any, body: any) {
     context: {
       adapter,
       internalAdapter: {
+        createOAuthUser: async (user: any, account: any) => {
+          const created = await adapter.create({ data: user, model: "user" });
+          return {
+            account: await adapter.create({
+              data: { ...account, userId: created.id },
+              model: "account",
+            }),
+            user: created,
+          };
+        },
         createSession: vi
           .fn()
           .mockResolvedValue({ id: "session-1", token: "tok-1" }),
+        deleteAccount: (id: string) =>
+          adapter.delete({
+            model: "account",
+            where: [{ field: "id", value: id }],
+          }),
+        findAccounts: async () => {
+          const account = await adapter.findOne({ model: "account" });
+          return account
+            ? [account, { id: "credential", providerId: "credential" }]
+            : [];
+        },
+        findUserById: (id: string) =>
+          adapter.findOne({
+            model: "user",
+            where: [{ field: "id", value: id }],
+          }),
+        linkAccount: (data: any) => adapter.create({ data, model: "account" }),
+        updateUser: (id: string, update: any) =>
+          adapter.update({
+            model: "user",
+            update,
+            where: [{ field: "id", value: id }],
+          }),
       },
+      options: {},
     },
     json: vi.fn((data: any) => data),
   };
@@ -140,13 +175,13 @@ function createMockContext(adapter: any, body: any) {
 
 describe("Issue #13: Login Widget P2002 when user exists via OIDC", () => {
   const widgetData = {
-    id: Number(TELEGRAM_USER_ID),
-    first_name: "Tom",
-    last_name: "Robak",
-    username: "tomrobak",
-    photo_url: "https://t.me/photo.jpg",
     auth_date: Math.floor(Date.now() / 1000),
+    first_name: "Tom",
     hash: "abc123",
+    id: Number(TELEGRAM_USER_ID),
+    last_name: "Robak",
+    photo_url: "https://t.me/photo.jpg",
+    username: "tomrobak",
   };
 
   beforeEach(() => {
@@ -187,14 +222,14 @@ describe("Issue #13: Login Widget P2002 when user exists via OIDC", () => {
     // Should create exactly one record: the telegram account
     expect(adapter.create).toHaveBeenCalledTimes(1);
     expect(adapter.create).toHaveBeenCalledWith({
-      model: "account",
       data: {
-        userId: "user-oidc-123",
-        providerId: "telegram",
         accountId: TELEGRAM_USER_ID,
+        providerId: "telegram",
         telegramId: TELEGRAM_USER_ID,
         telegramUsername: "tomrobak",
+        userId: "user-oidc-123",
       },
+      model: "account",
     });
   });
 
@@ -229,7 +264,8 @@ describe("Issue #13: Login Widget P2002 when user exists via OIDC", () => {
     expect(findOneCalls.length).toBeGreaterThanOrEqual(2);
 
     // The second call must be the telegramId lookup on the user table
-    const secondCall = findOneCalls[1]![0];
+    const [, call] = findOneCalls;
+    const [secondCall] = call!;
     expect(secondCall.model).toBe("user");
     expect(secondCall.where).toEqual([
       { field: "telegramId", value: TELEGRAM_USER_ID },
@@ -239,9 +275,9 @@ describe("Issue #13: Login Widget P2002 when user exists via OIDC", () => {
   it("should link existing OIDC user even when autoCreateUser is false", async () => {
     const { telegram } = await import("./index");
     const plugin = telegram({
+      autoCreateUser: false,
       botToken: BOT_TOKEN,
       botUsername: "test_bot",
-      autoCreateUser: false,
     });
     const handler = plugin.endpoints.signInWithTelegram as any;
 
@@ -254,11 +290,11 @@ describe("Issue #13: Login Widget P2002 when user exists via OIDC", () => {
     // Should still link, not throw USER_CREATION_DISABLED
     expect(adapter.create).toHaveBeenCalledTimes(1);
     expect(adapter.create).toHaveBeenCalledWith({
-      model: "account",
       data: expect.objectContaining({
-        userId: "user-oidc-123",
         providerId: "telegram",
+        userId: "user-oidc-123",
       }),
+      model: "account",
     });
     expect(ctx.context.internalAdapter.createSession).toHaveBeenCalledWith(
       "user-oidc-123"
@@ -271,13 +307,13 @@ describe("Issue #13: Mini App P2002 when user exists via OIDC", () => {
     "user=%7B%22id%22%3A830000001%2C%22first_name%22%3A%22Tom%22%2C%22username%22%3A%22tomrobak%22%7D&auth_date=1700000000&hash=abc123";
 
   const parsedMiniAppData = {
-    user: {
-      id: Number(TELEGRAM_USER_ID),
-      first_name: "Tom",
-      username: "tomrobak",
-    },
     auth_date: 1700000000,
     hash: "abc123",
+    user: {
+      first_name: "Tom",
+      id: Number(TELEGRAM_USER_ID),
+      username: "tomrobak",
+    },
   };
 
   beforeEach(() => {
@@ -325,14 +361,14 @@ describe("Issue #13: Mini App P2002 when user exists via OIDC", () => {
 
     expect(adapter.create).toHaveBeenCalledTimes(1);
     expect(adapter.create).toHaveBeenCalledWith({
-      model: "account",
       data: {
-        userId: "user-oidc-123",
-        providerId: "telegram",
         accountId: TELEGRAM_USER_ID,
+        providerId: "telegram",
         telegramId: TELEGRAM_USER_ID,
         telegramUsername: "tomrobak",
+        userId: "user-oidc-123",
       },
+      model: "account",
     });
   });
 

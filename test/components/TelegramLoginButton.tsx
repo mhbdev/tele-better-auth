@@ -12,26 +12,27 @@ export function TelegramLoginButton() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    let disposed = false;
+    let dispose: (() => void) | undefined;
     // Initialize Telegram Login Widget
     authClient
       .initTelegramWidget(
         "telegram-login-container",
         {
-          size: "large",
-          showUserPhoto: true,
           cornerRadius: 20,
           lang: "en",
+          showUserPhoto: true,
+          size: "large",
         },
         async (authData: TelegramAuthData) => {
+          if (disposed) {
+            return;
+          }
           setLoading(true);
           setError(null);
 
           try {
-            console.log("Telegram auth data received:", authData);
-
             const result = await authClient.signInWithTelegram(authData);
-
-            console.log("Sign in result:", result);
 
             if (result.error) {
               setError(result.error.message || "Failed to sign in");
@@ -57,10 +58,21 @@ export function TelegramLoginButton() {
           }
         }
       )
+      .then((cleanup) => {
+        if (disposed) {
+          cleanup();
+        } else {
+          dispose = cleanup;
+        }
+      })
       .catch((err: unknown) => {
         console.error("Failed to initialize Telegram widget:", err);
         setError("Failed to load Telegram login widget");
       });
+    return () => {
+      disposed = true;
+      dispose?.();
+    };
   }, [router]);
 
   return (

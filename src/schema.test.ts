@@ -6,18 +6,18 @@ function makeConfig(
   overrides: Partial<TelegramPluginConfig> = {}
 ): TelegramPluginConfig {
   return {
-    botToken: "tok",
-    botUsername: "bot",
-    widgetEnabled: true,
-    miniAppEnabled: false,
-    oidcEnabled: false,
-    oidcClientId: "123456789",
-    testMode: false,
     allowUserToLink: true,
     autoCreateUser: true,
+    botToken: "tok",
+    botUsername: "bot",
     maxAuthAge: 86400,
-    miniAppValidateInitData: true,
     miniAppAllowAutoSignin: true,
+    miniAppEnabled: false,
+    miniAppValidateInitData: true,
+    oidcClientId: "123456789",
+    oidcEnabled: false,
+    testMode: false,
+    widgetEnabled: true,
     ...overrides,
   };
 }
@@ -25,7 +25,7 @@ function makeConfig(
 describe("createTelegramSchema", () => {
   it("returns schema when widget is enabled", () => {
     const schema = createTelegramSchema(
-      makeConfig({ widgetEnabled: true, miniAppEnabled: false })
+      makeConfig({ miniAppEnabled: false, widgetEnabled: true })
     );
     expect(schema).toBeDefined();
     expect(schema!.user!.fields).toHaveProperty("telegramId");
@@ -37,7 +37,7 @@ describe("createTelegramSchema", () => {
 
   it("returns schema when miniApp is enabled (widget disabled)", () => {
     const schema = createTelegramSchema(
-      makeConfig({ widgetEnabled: false, miniAppEnabled: true })
+      makeConfig({ miniAppEnabled: true, widgetEnabled: false })
     );
     expect(schema).toBeDefined();
     expect(schema!.user!.fields).toHaveProperty("telegramId");
@@ -45,14 +45,14 @@ describe("createTelegramSchema", () => {
 
   it("returns schema when both widget and miniApp are enabled", () => {
     const schema = createTelegramSchema(
-      makeConfig({ widgetEnabled: true, miniAppEnabled: true })
+      makeConfig({ miniAppEnabled: true, widgetEnabled: true })
     );
     expect(schema).toBeDefined();
   });
 
   it("returns undefined when neither widget nor miniApp is enabled (OIDC-only)", () => {
     const schema = createTelegramSchema(
-      makeConfig({ widgetEnabled: false, miniAppEnabled: false })
+      makeConfig({ miniAppEnabled: false, widgetEnabled: false })
     );
     expect(schema).toBeUndefined();
   });

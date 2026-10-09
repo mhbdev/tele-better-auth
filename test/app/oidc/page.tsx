@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
 export default function OIDCPage() {
@@ -10,16 +10,49 @@ export default function OIDCPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (
+        event.origin !== window.location.origin ||
+        !event.data ||
+        event.data.type !== "telegram-oidc-complete"
+      ) {
+        return;
+      }
+      setLoading(false);
+      if (event.data.success !== true) {
+        setError("Telegram authentication failed");
+        return;
+      }
+      router.push("/dashboard");
+      router.refresh();
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [router]);
+
   const handleOIDCSignIn = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      await authClient.signInWithTelegramOIDC({
-        callbackURL: "/dashboard",
-        errorCallbackURL: "/oidc?error=auth_failed",
+      const result = await authClient.signInWithTelegramOIDC({
+        callbackURL: flow === "popup" ? "/oidc/complete" : "/dashboard",
+        errorCallbackURL:
+          flow === "popup"
+            ? "/oidc/complete?error=auth_failed"
+            : "/oidc?error=auth_failed",
         flow,
       });
+      if (result.error) {
+        setError(
+          result.error.message || "Unable to start Telegram authentication"
+        );
+        setLoading(false);
+      }
+      if (flow === "popup") {
+        setLoading(false);
+      }
     } catch (err: any) {
       console.error("OIDC sign-in error:", err);
       setError(err.message || "Failed to initiate OIDC sign-in");
@@ -29,9 +62,9 @@ export default function OIDCPage() {
 
   // Check for error in URL params
   const searchParams =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search)
-      : null;
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search);
   const urlError = searchParams?.get("error");
 
   return (
@@ -89,7 +122,7 @@ export default function OIDCPage() {
               <p className="mt-2 text-blue-700 text-xs">
                 Selected:{" "}
                 {flow === "popup"
-                  ? "Popup mode (falls back to same tab if blocked)"
+                  ? "Popup mode (allow popups in your browser)"
                   : "Same-tab redirect mode"}
               </p>
             </div>

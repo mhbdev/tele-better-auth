@@ -39,11 +39,12 @@ export default function MiniAppPage() {
         if ((window as any).Telegram?.WebApp) {
           break;
         }
+        // biome-ignore lint/performance/noAwaitInLoops: Poll for the Telegram SDK loading before using it.
         await new Promise((resolve) => setTimeout(resolve, 100));
-        attempts++;
+        attempts += 1;
       }
 
-      const Telegram = (window as any).Telegram;
+      const { Telegram } = window as any;
 
       if (!Telegram?.WebApp) {
         setStatus("❌ Not running in Telegram Mini App");

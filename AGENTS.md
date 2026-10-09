@@ -1,18 +1,18 @@
-# tele-auth-telegram
+# tele-better-auth
 
-Telegram authentication plugin for [Better Auth](https://www.better-auth.com/). Login Widget + Mini App + OIDC auth flows, published as `tele-auth-telegram` on npm.
+Telegram authentication plugin for [Better Auth](https://www.better-auth.com/). Login Widget + Mini App + OIDC auth flows, published as `tele-better-auth` on npm.
 
 ## Architecture
 
 Two entry points, two export paths:
 
-- **`src/index.ts`** -> `tele-auth-telegram` -- Server plugin (`BetterAuthPlugin`)
-- **`src/client.ts`** -> `tele-auth-telegram/client` -- Browser client plugin (widget management, Mini App auto-signin)
+- **`src/index.ts`** -> `tele-better-auth` -- Server plugin (`BetterAuthPlugin`)
+- **`src/client.ts`** -> `tele-better-auth/client` -- Browser client plugin (widget management, Mini App auto-signin)
 
 Supporting modules:
 
 - **`src/verify.ts`** -- HMAC-SHA256 verification via Web Crypto API. Two paths: Login Widget (`SHA256(botToken)`) and Mini App (`HMAC-SHA256("WebAppData", botToken)`)
-- **`src/oidc.ts`** -- Telegram OIDC provider factory. Creates an `OAuthProvider` for Better Auth's social login system using OAuth 2.0 Authorization Code flow with PKCE via `oauth.telegram.org`. RS256 JWT verification via JWKS.
+- **`src/oidc.ts`** -- Telegram OIDC provider factory. Creates an `OAuthProvider` for Better Auth's social login system using OAuth 2.0 Authorization Code flow with PKCE via `oauth.telegram.org`. JWT verification via cached JWKS and an explicit algorithm allowlist; Generic OAuth helper uses the same verified identity model.
 - **`src/types.ts`** -- All TypeScript interfaces (`TelegramPluginOptions`, `TelegramAuthData`, Mini App types, `TelegramOIDCOptions`, `TelegramOIDCClaims`)
 - **`src/constants.ts`** -- Error codes, success messages, `PLUGIN_ID`, `DEFAULT_MAX_AUTH_AGE`, OIDC endpoints/issuer constants
 
@@ -26,6 +26,8 @@ Supporting modules:
 | GET    | `/telegram/config`           | None    | Returns bot username for widget init  |
 | POST   | `/telegram/miniapp/signin`   | None    | Sign in from Mini App (optional)      |
 | POST   | `/telegram/miniapp/validate` | None    | Validate Mini App initData (optional) |
+| POST   | `/telegram/miniapp/link` | Session | Link a verified Mini App identity |
+| POST   | `/telegram/miniapp/unlink` | Fresh session | Unlink the shared Telegram account |
 
 OIDC (when `oidc.enabled`) uses Better Auth's built-in social login routes (`POST /sign-in/social` with `provider: "telegram-oidc"`, `GET /callback/telegram-oidc`). The plugin injects a `telegram-oidc` social provider via the `init` hook.
 
@@ -33,7 +35,7 @@ Schema conditionally extends `user` table with `telegramId`, `telegramUsername`,
 
 ## Code Style
 
-- **Biome** via ultracite (`biome.jsonc` extends `ultracite/core`)
+- **Biome** via ultracite (`biome.jsonc` extends `ultracite/biome/core`)
 - **lint-staged** runs `ultracite fix` on pre-commit
 - Relaxed rules: `noNonNullAssertion`, `noExplicitAny`, `useNamingConvention`, `noMagicNumbers` all off
 - ES modules, `verbatimModuleSyntax`, strict null checks, `noUncheckedIndexedAccess`
@@ -48,8 +50,8 @@ Schema conditionally extends `user` table with `telegramId`, `telegramUsername`,
 ## Commands
 
 ```bash
-npm run build          # tsup (ESM + CJS + .d.ts)
-npm run dev            # tsup --watch
+npm run build          # tsdown (ESM + CJS + .d.ts)
+npm run dev            # tsdown --watch
 npm run type-check     # tsc --noEmit
 npm run test           # vitest run
 npm run test:watch     # vitest (watch mode)
@@ -62,13 +64,13 @@ Single test file: `npx vitest run src/verify.test.ts`
 
 ## Dependencies
 
-**Runtime (peer):** `better-auth` (^1.4.18)
+**Runtime (peer):** `better-auth` (^1.7.7)
 
-**Build external:** `better-auth`, `zod` (tsup external)
+**Runtime:** `jose`; peers `better-auth` and `@better-auth/core` (^1.7.7). All runtime dependencies stay external in tsdown.
 
-**Dev:** Biome, ultracite, tsup, TypeScript 5.9, Vitest 4, happy-dom
+**Dev:** Biome, ultracite, tsdown, TypeScript 7, Vitest 5, happy-dom
 
-**Node:** >= 22.0.0
+**Runtime Node:** >= 22.12.0. Development tools: Node 22.18+, 24.11+, or 26+.
 
 ## Review Guidelines
 

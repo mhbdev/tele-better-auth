@@ -1,0 +1,10 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "groupings": [
+    {
+      "title": "Telegram authentication",
+      "description": "Integrate Telegram sign-in and account linking with Better Auth.",
+      "skills": ["tele-better-auth"]
+    }
+  ]
+}

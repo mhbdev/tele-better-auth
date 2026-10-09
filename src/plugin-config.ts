@@ -46,8 +46,8 @@ export function createPluginConfig(
   options: TelegramPluginOptions
 ): TelegramPluginConfig {
   const {
-    botToken,
-    botUsername,
+    botToken = "",
+    botUsername = "",
     allowUserToLink = true,
     autoCreateUser = true,
     loginWidget,
@@ -58,12 +58,23 @@ export function createPluginConfig(
     testMode = false,
   } = options;
 
-  if (!botToken) {
+  if ((loginWidget !== false || miniApp?.enabled) && !botToken) {
     throw new Error(ERROR_CODES.BOT_TOKEN_REQUIRED.message);
   }
 
-  if (!botUsername) {
+  if (loginWidget !== false && !botUsername) {
     throw new Error(ERROR_CODES.BOT_USERNAME_REQUIRED.message);
+  }
+
+  if (!Number.isFinite(maxAuthAge) || maxAuthAge < 0) {
+    throw new Error(
+      "Telegram plugin: maxAuthAge must be a finite non-negative number"
+    );
+  }
+  if (miniApp?.enabled && miniApp.validateInitData === false) {
+    throw new Error(
+      "Telegram plugin: Mini App authentication requires initData verification"
+    );
   }
 
   const widgetEnabled = loginWidget !== false;
@@ -78,20 +89,20 @@ export function createPluginConfig(
   }
 
   return {
-    botToken,
-    botUsername,
-    widgetEnabled,
-    miniAppEnabled,
-    oidcEnabled,
-    testMode,
     allowUserToLink,
     autoCreateUser,
-    maxAuthAge,
-    miniAppValidateInitData: miniApp?.validateInitData ?? true,
-    miniAppAllowAutoSignin: miniApp?.allowAutoSignin ?? true,
-    mapTelegramDataToUser,
+    botToken,
+    botUsername,
     mapMiniAppDataToUser: miniApp?.mapMiniAppDataToUser,
+    mapTelegramDataToUser,
+    maxAuthAge,
+    miniAppAllowAutoSignin: miniApp?.allowAutoSignin ?? true,
+    miniAppEnabled,
+    miniAppValidateInitData: miniApp?.validateInitData ?? true,
     oidc,
     oidcClientId,
+    oidcEnabled,
+    testMode,
+    widgetEnabled,
   };
 }

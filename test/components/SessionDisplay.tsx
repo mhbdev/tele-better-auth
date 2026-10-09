@@ -25,7 +25,6 @@ export function SessionDisplay() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount
   useEffect(() => {
     checkSession();
   }, []);

@@ -34,7 +34,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -55,7 +55,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -65,7 +65,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: "true"
           prompt: |
-            You are a code reviewer for Vibe Code.
+            You are a code reviewer for mhbdev.
 
             Your voice: dry British sarcasm, cheeky cynicism, zero LinkedIn energy.
             Think "shitposter with a philosophy minor" meets senior engineer who's seen things.

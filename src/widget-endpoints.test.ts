@@ -20,11 +20,13 @@ vi.mock("better-auth/api", () => {
     }
   }
   return {
+    APIError: MockAPIError,
     createAuthEndpoint: vi.fn(
       (_path: string, _options: any, handler: any) => handler
     ),
+    createAuthMiddleware: (handler: any) => handler,
+    freshSessionMiddleware: {},
     sessionMiddleware: {},
-    APIError: MockAPIError,
   };
 });
 
@@ -33,8 +35,8 @@ vi.mock("better-auth/cookies", () => ({
 }));
 
 vi.mock("./verify", () => ({
-  verifyTelegramAuth: vi.fn(),
   validateTelegramAuthData: vi.fn(),
+  verifyTelegramAuth: vi.fn(),
 }));
 
 import { ERROR_CODES, SUCCESS_MESSAGES } from "./constants";
@@ -46,41 +48,42 @@ const mockedValidate = vi.mocked(validateTelegramAuthData);
 const mockedVerify = vi.mocked(verifyTelegramAuth);
 
 const TELEGRAM_DATA = {
-  id: 12345,
-  first_name: "Alice",
-  last_name: "Smith",
-  username: "alice",
-  photo_url: "https://t.me/alice.jpg",
   auth_date: Math.floor(Date.now() / 1000),
+  first_name: "Alice",
   hash: "deadbeef",
+  id: 12345,
+  last_name: "Smith",
+  photo_url: "https://t.me/alice.jpg",
+  username: "alice",
 };
 
 function makeConfig(
   overrides: Partial<TelegramPluginConfig> = {}
 ): TelegramPluginConfig {
   return {
-    botToken: "tok:en",
-    botUsername: "bot",
-    widgetEnabled: true,
-    miniAppEnabled: false,
-    oidcEnabled: false,
-    oidcClientId: "123456789",
-    testMode: false,
     allowUserToLink: true,
     autoCreateUser: true,
+    botToken: "tok:en",
+    botUsername: "bot",
     maxAuthAge: 86400,
-    miniAppValidateInitData: true,
     miniAppAllowAutoSignin: true,
+    miniAppEnabled: false,
+    miniAppValidateInitData: true,
+    oidcClientId: "123456789",
+    oidcEnabled: false,
+    testMode: false,
+    widgetEnabled: true,
     ...overrides,
   };
 }
 
 function mockAdapter(overrides: Record<string, any> = {}) {
   return {
-    findOne: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({ id: "new-id" }),
-    update: vi.fn(),
     delete: vi.fn(),
+    findOne: vi.fn().mockResolvedValue(null),
+    transaction: (callback: any) => callback({}),
+    update: vi.fn(),
     ...overrides,
   };
 }
@@ -90,12 +93,46 @@ function mockCtx(adapter: any, body: any, session: any = null) {
     body: Promise.resolve(body),
     context: {
       adapter,
-      session,
       internalAdapter: {
+        createOAuthUser: async (user: any, account: any) => {
+          const created = await adapter.create({ data: user, model: "user" });
+          return {
+            account: await adapter.create({
+              data: { ...account, userId: created.id },
+              model: "account",
+            }),
+            user: created,
+          };
+        },
         createSession: vi
           .fn()
           .mockResolvedValue({ id: "sess-1", token: "tok" }),
+        deleteAccount: (id: string) =>
+          adapter.delete({
+            model: "account",
+            where: [{ field: "id", value: id }],
+          }),
+        findAccounts: async () => {
+          const account = await adapter.findOne({ model: "account" });
+          return account
+            ? [account, { id: "credential", providerId: "credential" }]
+            : [];
+        },
+        findUserById: (id: string) =>
+          adapter.findOne({
+            model: "user",
+            where: [{ field: "id", value: id }],
+          }),
+        linkAccount: (data: any) => adapter.create({ data, model: "account" }),
+        updateUser: (id: string, update: any) =>
+          adapter.update({
+            model: "user",
+            update,
+            where: [{ field: "id", value: id }],
+          }),
       },
+      options: {},
+      session,
     },
     json: vi.fn((data: any) => data),
   };
@@ -136,7 +173,7 @@ describe("signInWithTelegram", () => {
     const adapter = mockAdapter({
       findOne: vi.fn().mockImplementation(({ model }: any) => {
         if (model === "account") {
-          return { userId: "existing-user", id: "acc-1" };
+          return { id: "acc-1", userId: "existing-user" };
         }
         if (model === "user") {
           return { id: "existing-user", name: "Alice" };
@@ -159,6 +196,12 @@ describe("signInWithTelegram", () => {
 
   it("creates new user and account when autoCreateUser is true", async () => {
     const adapter = mockAdapter({
+      create: vi.fn().mockImplementation(({ model }: any) => {
+        if (model === "user") {
+          return { id: "new-user-1" };
+        }
+        return { id: "acc-1" };
+      }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         // account lookup → null, user-by-telegramId → null
         // user-by-id (after creation) → the new user
@@ -170,12 +213,6 @@ describe("signInWithTelegram", () => {
           return null; // telegramId lookup → not found
         }
         return null;
-      }),
-      create: vi.fn().mockImplementation(({ model }: any) => {
-        if (model === "user") {
-          return { id: "new-user-1" };
-        }
-        return { id: "acc-1" };
       }),
     });
 
@@ -215,12 +252,13 @@ describe("signInWithTelegram", () => {
 
   it("uses mapTelegramDataToUser when provided", async () => {
     const mapper = vi.fn(() => ({
-      name: "Custom Name",
       email: "custom@example.com",
       image: "https://custom.img",
+      name: "Custom Name",
     }));
 
     const adapter = mockAdapter({
+      create: vi.fn().mockResolvedValue({ id: "new-1" }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         if (model === "user") {
           const idFilter = where.find((w: any) => w.field === "id");
@@ -231,7 +269,6 @@ describe("signInWithTelegram", () => {
         }
         return null;
       }),
-      create: vi.fn().mockResolvedValue({ id: "new-1" }),
     });
 
     const endpoints = createWidgetEndpoints(
@@ -248,6 +285,7 @@ describe("signInWithTelegram", () => {
   it("builds correct name without last_name", async () => {
     const noLastName = { ...TELEGRAM_DATA, last_name: undefined };
     const adapter = mockAdapter({
+      create: vi.fn().mockResolvedValue({ id: "u1" }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         if (model === "user") {
           const idFilter = where.find((w: any) => w.field === "id");
@@ -258,7 +296,6 @@ describe("signInWithTelegram", () => {
         }
         return null;
       }),
-      create: vi.fn().mockResolvedValue({ id: "u1" }),
     });
 
     const endpoints = createWidgetEndpoints(makeConfig());
@@ -270,6 +307,7 @@ describe("signInWithTelegram", () => {
 
   it("builds correct name with last_name", async () => {
     const adapter = mockAdapter({
+      create: vi.fn().mockResolvedValue({ id: "u1" }),
       findOne: vi.fn().mockImplementation(({ model, where }: any) => {
         if (model === "user") {
           const idFilter = where.find((w: any) => w.field === "id");
@@ -280,7 +318,6 @@ describe("signInWithTelegram", () => {
         }
         return null;
       }),
-      create: vi.fn().mockResolvedValue({ id: "u1" }),
     });
 
     const endpoints = createWidgetEndpoints(makeConfig());
@@ -293,7 +330,7 @@ describe("signInWithTelegram", () => {
   it("passes botToken and maxAuthAge to verifyTelegramAuth", async () => {
     const config = makeConfig({ botToken: "my:token", maxAuthAge: 999 });
     const adapter = mockAdapter({
-      findOne: vi.fn().mockResolvedValue({ userId: "u1", id: "a1" }),
+      findOne: vi.fn().mockResolvedValue({ id: "a1", userId: "u1" }),
     });
 
     const endpoints = createWidgetEndpoints(config);
@@ -367,8 +404,8 @@ describe("linkTelegram", () => {
   it("throws TELEGRAM_ALREADY_LINKED_OTHER when linked to different user", async () => {
     const adapter = mockAdapter({
       findOne: vi.fn().mockResolvedValue({
-        userId: "other-user",
         id: "acc-1",
+        userId: "other-user",
       }),
     });
 
@@ -383,8 +420,8 @@ describe("linkTelegram", () => {
   it("throws TELEGRAM_ALREADY_LINKED_SELF when already linked to same user", async () => {
     const adapter = mockAdapter({
       findOne: vi.fn().mockResolvedValue({
-        userId: "current-user",
         id: "acc-1",
+        userId: "current-user",
       }),
     });
 
@@ -405,29 +442,29 @@ describe("linkTelegram", () => {
 
     // Account created
     expect(adapter.create).toHaveBeenCalledWith({
-      model: "account",
       data: {
-        userId: "current-user",
-        providerId: "telegram",
         accountId: "12345",
+        providerId: "telegram",
         telegramId: "12345",
         telegramUsername: "alice",
+        userId: "current-user",
       },
+      model: "account",
     });
 
     // User updated with Telegram data
     expect(adapter.update).toHaveBeenCalledWith({
       model: "user",
-      where: [{ field: "id", value: "current-user" }],
       update: {
         telegramId: "12345",
         telegramUsername: "alice",
       },
+      where: [{ field: "id", value: "current-user" }],
     });
 
     expect(ctx.json).toHaveBeenCalledWith({
-      success: true,
       message: SUCCESS_MESSAGES.TELEGRAM_LINKED,
+      success: true,
     });
   });
 });
@@ -463,8 +500,8 @@ describe("unlinkTelegram", () => {
     const adapter = mockAdapter({
       findOne: vi.fn().mockResolvedValue({
         id: "acc-1",
-        userId: "current-user",
         providerId: "telegram",
+        userId: "current-user",
       }),
     });
 
@@ -481,16 +518,17 @@ describe("unlinkTelegram", () => {
     // User Telegram fields cleared
     expect(adapter.update).toHaveBeenCalledWith({
       model: "user",
-      where: [{ field: "id", value: "current-user" }],
       update: {
         telegramId: null,
+        telegramPhoneNumber: null,
         telegramUsername: null,
       },
+      where: [{ field: "id", value: "current-user" }],
     });
 
     expect(ctx.json).toHaveBeenCalledWith({
-      success: true,
       message: SUCCESS_MESSAGES.TELEGRAM_UNLINKED,
+      success: true,
     });
   });
 });
