@@ -620,6 +620,15 @@ describe("parseMiniAppInitData", () => {
     expect(result.hash).toBe("abc123");
   });
 
+  it("parses current Telegram Mini App signature and join-request fields", () => {
+    const result = parseMiniAppInitData(
+      "auth_date=1234567890&hash=abc123&signature=ed25519&chat_join_request_query_id=join-123"
+    );
+
+    expect(result.signature).toBe("ed25519");
+    expect(result.chat_join_request_query_id).toBe("join-123");
+  });
+
   it("should handle invalid JSON gracefully", () => {
     const initData = "user={invalid json}&auth_date=1234567890&hash=abc123";
     const result = parseMiniAppInitData(initData);

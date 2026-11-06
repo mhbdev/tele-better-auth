@@ -26,7 +26,9 @@ vi.mock("better-auth/api", () => {
       (_path: string, _options: any, handler: any) => handler
     ),
     createAuthMiddleware: (handler: any) => handler,
+    formCsrfMiddleware: {},
     freshSessionMiddleware: {},
+    sensitiveSessionMiddleware: {},
     sessionMiddleware: {},
   };
 });
@@ -103,6 +105,26 @@ function mockAdapter(overrides: Record<string, any> = {}) {
 }
 
 function mockCtx(adapter: any, body: any) {
+  const { findOne } = adapter;
+  let persistedTelegramAccount: any;
+  adapter.findOne = vi.fn((query: any) => {
+    if (
+      persistedTelegramAccount &&
+      query.model === "account" &&
+      query.where?.some(
+        (condition: any) =>
+          condition.field === "providerId" && condition.value === "telegram"
+      ) &&
+      query.where?.some(
+        (condition: any) =>
+          condition.field === "accountId" &&
+          condition.value === persistedTelegramAccount.accountId
+      )
+    ) {
+      return persistedTelegramAccount;
+    }
+    return findOne(query);
+  });
   return {
     body: Promise.resolve(body),
     context: {
@@ -110,11 +132,17 @@ function mockCtx(adapter: any, body: any) {
       internalAdapter: {
         createOAuthUser: async (user: any, account: any) => {
           const created = await adapter.create({ data: user, model: "user" });
+          const accountRecord = await adapter.create({
+            data: { ...account, userId: created.id },
+            model: "account",
+          });
+          persistedTelegramAccount = {
+            ...accountRecord,
+            ...account,
+            userId: created.id,
+          };
           return {
-            account: await adapter.create({
-              data: { ...account, userId: created.id },
-              model: "account",
-            }),
+            account: accountRecord,
             user: created,
           };
         },
@@ -137,7 +165,14 @@ function mockCtx(adapter: any, body: any) {
             model: "user",
             where: [{ field: "id", value: id }],
           }),
-        linkAccount: (data: any) => adapter.create({ data, model: "account" }),
+        linkAccount: async (data: any) => {
+          const accountRecord = await adapter.create({
+            data,
+            model: "account",
+          });
+          persistedTelegramAccount = { ...accountRecord, ...data };
+          return accountRecord;
+        },
         updateUser: (id: string, update: any) =>
           adapter.update({
             model: "user",
@@ -346,7 +381,7 @@ describe("signInWithMiniApp", () => {
   });
 
   it("uses mapMiniAppDataToUser when provided", async () => {
-    const mapper = vi.fn(() => ({
+    const mapper = vi.fn(async () => ({
       email: "bob@example.com",
       name: "Custom Bob",
     }));
@@ -404,7 +439,16 @@ describe("signInWithMiniApp", () => {
   it("passes botToken and maxAuthAge to verifyMiniAppInitData", async () => {
     const config = makeConfig({ botToken: "my:tok", maxAuthAge: 500 });
     const adapter = mockAdapter({
-      findOne: vi.fn().mockResolvedValue({ id: "a1", userId: "u1" }),
+      findOne: vi.fn(({ model }: any) =>
+        model === "account"
+          ? {
+              accountId: "99",
+              id: "a1",
+              providerId: "telegram",
+              userId: "u1",
+            }
+          : { id: "u1" }
+      ),
     });
 
     const endpoints = createMiniAppEndpoints(config);

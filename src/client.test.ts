@@ -41,6 +41,7 @@ describe("telegramClient", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    window.location.hash = "";
   });
 
   describe("Plugin structure", () => {
@@ -384,7 +385,7 @@ describe("telegramClient", () => {
       const script = container.querySelector("script");
       const onAuthAttr = script?.getAttribute("data-onauth");
 
-      expect(onAuthAttr).toMatch(/telegramCallback_[a-f0-9]+\(user\)/);
+      expect(onAuthAttr).toMatch(/telegramCallback_[a-f0-9]+\(user\)/u);
 
       // Extract callback name
       const callbackName = onAuthAttr?.replace("(user)", "");
@@ -908,6 +909,22 @@ describe("telegramClient", () => {
           method: "POST",
         });
         expect(result).toEqual(mockResponse);
+      });
+
+      it("should use signed launch data from the URL fragment before the SDK loads", async () => {
+        const mockInitData =
+          "query_id=AAE123&user=%7B%22id%22%3A123%7D&auth_date=1234567890&hash=abc123";
+        window.location.hash = `tgWebAppData=${encodeURIComponent(mockInitData)}&tgWebAppVersion=8.0`;
+        mockFetch.mockResolvedValueOnce({ data: { session: {}, user: {} } });
+
+        const actions = client.getActions(mockFetch);
+        await actions.autoSignInFromMiniApp();
+
+        expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/signin", {
+          body: { initData: mockInitData },
+          method: "POST",
+        });
+        window.location.hash = "";
       });
 
       it("should handle errors from API", async () => {

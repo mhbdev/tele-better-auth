@@ -1,6 +1,6 @@
 # Installation
 
-Requires Node.js 22.12+ and Better Auth 1.7.7+.
+Requires Node.js 22.12+ and Better Auth 1.7.17+.
 
 ```sh
 npm install better-auth tele-better-auth

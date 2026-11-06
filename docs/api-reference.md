@@ -19,7 +19,7 @@ Paths are relative to Better Auth's base path, normally `/api/auth`.
 
 Widget routes require `loginWidget !== false`; Mini App routes require `miniApp.enabled`. Mini App POST bodies contain `{ initData: string }`. Widget sign-in/link bodies are the original signed `TelegramAuthData`. Unlink actions need no body.
 
-OIDC and Generic OAuth use Better Auth's social endpoints with `provider: "telegram-oidc"`: `POST /sign-in/social`, `POST /link-social`, `GET /callback/telegram-oidc`. Use the core `/unlink-account` endpoint to unlink OIDC.
+OIDC and Generic OAuth use Better Auth's social endpoints with `provider: "telegram-oidc"`: `POST /sign-in/social`, `POST /link-social`, `GET /callback/telegram-oidc`. Client-submitted ID tokens must include the nonce they carry. Use the core `/unlink-account` endpoint to unlink OIDC.
 
 Invalid input uses 400; invalid authentication/session uses 401; policy-disabled linking uses 403; missing identities/routes use 404; conflicting linked identities use 409. The Mini App validate action reports invalid signatures as `valid: false`. Better Auth determines OAuth errors and redirects.
 

@@ -58,6 +58,54 @@ function token(
 }
 
 describe("OIDC verification and mapping", () => {
+  it("does not issue a session after an account hook revokes an OIDC account", async () => {
+    const db: {
+      user: any[];
+      account: any[];
+      session: any[];
+      verification: any[];
+    } = { account: [], session: [], user: [], verification: [] };
+    const auth = betterAuth({
+      baseURL: "https://app.test",
+      database: memoryAdapter(db),
+      databaseHooks: {
+        account: {
+          create: {
+            after: async (account, ctx) => {
+              await ctx!.context.internalAdapter.deleteAccount(account.id);
+            },
+          },
+        },
+      },
+      plugins: [
+        telegram({
+          loginWidget: false,
+          oidc: { ...credentials, enabled: true },
+        }),
+      ],
+      secret: "a-reliable-secret-with-at-least-32-characters",
+    });
+    const post = (path: string) =>
+      auth.handler(
+        new Request(`https://app.test/api/auth${path}`, {
+          body: JSON.stringify({
+            idToken: { nonce: "browser-nonce", token: jwt },
+            provider: "telegram-oidc",
+          }),
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://app.test",
+          },
+          method: "POST",
+        })
+      );
+    const jwt = await token({ nonce: "browser-nonce" });
+    const first = await post("/sign-in/social");
+    expect(first.status).toBe(401);
+    expect(db.session).toHaveLength(0);
+    expect(db.account).toHaveLength(0);
+  });
+
   it.each([false, true])(
     "supports real social sign-in, link and unlink with genericOAuth=%s",
     async (generic) => {
@@ -125,10 +173,13 @@ describe("OIDC verification and mapping", () => {
         .getSetCookie()
         .map((value) => value.split(";")[0])
         .join("; ");
-      const jwt = await token();
+      const jwt = await token({ nonce: "browser-nonce" });
       const linked = await post(
         "/link-social",
-        { idToken: { token: jwt }, provider: "telegram-oidc" },
+        {
+          idToken: { nonce: "browser-nonce", token: jwt },
+          provider: "telegram-oidc",
+        },
         cookie
       );
       expect(linked.status, await linked.clone().text()).toBe(200);
@@ -138,7 +189,7 @@ describe("OIDC verification and mapping", () => {
       )!;
       expect(account.accountId).toBe("subject-42");
       const signin = await post("/sign-in/social", {
-        idToken: { token: jwt },
+        idToken: { nonce: "browser-nonce", token: jwt },
         provider: "telegram-oidc",
       });
       expect(signin.status).toBe(200);
@@ -187,10 +238,16 @@ describe("OIDC verification and mapping", () => {
   it("requires the separate Web Login secret", () => {
     expect(() => createTelegramOIDCProvider("123:bot")).toThrow("clientSecret");
   });
+  it("can disable client-submitted ID-token sign-in", () => {
+    expect(
+      provider({ disableIdTokenSignIn: true }).options?.disableIdTokenSignIn
+    ).toBe(true);
+  });
   it("validates a real signature and caches the JWKS across calls", async () => {
     const p = provider();
-    const jwt = await token();
-    expect(await verifyProviderIdToken(p, jwt)).toBe(true);
+    const jwt = await token({ nonce: "browser-nonce" });
+    expect(await verifyProviderIdToken(p, jwt, "browser-nonce")).toBe(true);
+    expect(await verifyProviderIdToken(p, jwt)).toBe(false);
     const info = await p.getUserInfo({ idToken: jwt });
     expect(info?.user).toMatchObject({
       email: "subject-42@telegram.oidc",
@@ -261,9 +318,17 @@ describe("OIDC verification and mapping", () => {
     });
     const info = await p.getUserInfo({ idToken: await token() });
     expect(info?.user.emailVerified).toBe(false);
+    expect(info?.user.id).toBeUndefined();
     expect(await p.accountSubject({ profile: info!.data, tokens: {} })).toBe(
       "subject-42"
     );
+  });
+  it("awaits async OIDC profile mappers", async () => {
+    const p = provider({
+      mapOIDCProfileToUser: async () => ({ name: "Mapped asynchronously" }),
+    });
+    const info = await p.getUserInfo({ idToken: await token() });
+    expect(info?.user.name).toBe("Mapped asynchronously");
   });
   it("uses a usable display name when profile scope is absent", async () => {
     const info = await provider().getUserInfo({
@@ -315,8 +380,16 @@ describe("OIDC verification and mapping", () => {
   });
   it("constructs configurable scopes", () => {
     expect(buildScopes({})).toEqual(["openid", "profile"]);
+    expect(buildScopes({ scopes: ["phone"] })).toEqual([
+      "openid",
+      "profile",
+      "phone",
+    ]);
+    expect(
+      buildScopes({ disableDefaultScope: true, scopes: ["phone"] })
+    ).toEqual(["openid", "phone"]);
     expect(
       buildScopes({ requestBotAccess: true, requestPhone: true, scopes: [] })
-    ).toEqual(["openid", "phone", "telegram:bot_access"]);
+    ).toEqual(["openid", "profile", "phone", "telegram:bot_access"]);
   });
 });

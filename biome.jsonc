@@ -1,10 +1,36 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/biome/core"],
+  "formatter": { "lineEnding": "auto" },
   "overrides": [
     {
-      "includes": ["examples/**/*.tsx", "test/**/*.tsx"],
-      "linter": { "rules": { "performance": { "noJsxPropsBind": "off" } } }
+      "includes": ["examples/**/*.ts", "examples/**/*.tsx", "test/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUndeclaredDependencies": "off" },
+          "nursery": { "useTailwindSortedClasses": "off" },
+          "performance": { "noJsxPropsBind": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["src/**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useDomQuerySelector": "off",
+            "useImportsFirst": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/client.ts"],
+      "linter": {
+        "rules": {
+          "style": { "useDomQuerySelector": "off" }
+        }
+      }
     }
   ],
   "linter": {

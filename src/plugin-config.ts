@@ -4,6 +4,7 @@ import type {
   TelegramMiniAppUser,
   TelegramOIDCOptions,
   TelegramPluginOptions,
+  TelegramUserMapper,
 } from "./types";
 
 /**
@@ -15,18 +16,8 @@ export interface TelegramPluginConfig {
   autoCreateUser: boolean;
   botToken: string;
   botUsername: string;
-  mapMiniAppDataToUser?: (data: TelegramMiniAppUser) => {
-    name?: string;
-    email?: string;
-    image?: string;
-    [key: string]: any;
-  };
-  mapTelegramDataToUser?: (data: TelegramAuthData) => {
-    name?: string;
-    email?: string;
-    image?: string;
-    [key: string]: any;
-  };
+  mapMiniAppDataToUser?: TelegramUserMapper<TelegramMiniAppUser>;
+  mapTelegramDataToUser?: TelegramUserMapper<TelegramAuthData>;
   maxAuthAge: number;
   miniAppAllowAutoSignin: boolean;
   miniAppEnabled: boolean;

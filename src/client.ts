@@ -4,6 +4,24 @@ import type { telegram } from "./index";
 import type { TelegramAuthData, TelegramOIDCClaims } from "./types";
 
 type TelegramPlugin = typeof telegram;
+
+function getMiniAppInitData(): string | undefined {
+  const sdkInitData = (window as any).Telegram?.WebApp?.initData;
+  if (sdkInitData) {
+    return sdkInitData;
+  }
+
+  // Telegram includes signed launch data in the fragment before its SDK loads.
+  try {
+    const { hash } = window.location;
+    if (!hash) {
+      return undefined;
+    }
+    return new URLSearchParams(hash.slice(1)).get("tgWebAppData") || undefined;
+  } catch {
+    return undefined;
+  }
+}
 type ClientGetActions = NonNullable<BetterAuthClientPlugin["getActions"]>;
 type ClientFetch = Parameters<ClientGetActions>[0];
 type ClientStore = Parameters<ClientGetActions>[1];
@@ -29,7 +47,7 @@ const widgetCleanup = new WeakMap<HTMLElement, () => void>();
  * Legacy Telegram Login Widget script URL
  * (iframe-based widget documented in /widgets/login-legacy)
  */
-const TELEGRAM_WIDGET_SCRIPT = "https://telegram.org/js/telegram-widget.js?22";
+const TELEGRAM_WIDGET_SCRIPT = "https://telegram.org/js/telegram-widget.js?24";
 
 /**
  * New Telegram Login library script URL
@@ -616,14 +634,13 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
             throw new Error("This method can only be called in browser");
           }
 
-          const { Telegram } = window as any;
-          if (!Telegram?.WebApp?.initData) {
+          const initData = getMiniAppInitData();
+          if (!initData) {
             throw new Error(
               "Not running in Telegram Mini App or initData not available"
             );
           }
 
-          const { initData } = Telegram.WebApp;
           return await $fetch("/telegram/miniapp/signin", {
             body: { initData },
             method: "POST",

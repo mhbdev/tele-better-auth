@@ -22,7 +22,9 @@ vi.mock("better-auth/api", () => {
       (_path: string, _options: any, handler: any) => handler
     ),
     createAuthMiddleware: (handler: any) => handler,
+    formCsrfMiddleware: {},
     freshSessionMiddleware: {},
+    sensitiveSessionMiddleware: {},
     sessionMiddleware: {},
   };
 });

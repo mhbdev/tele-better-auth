@@ -12,11 +12,19 @@ import {
   TELEGRAM_OIDC_PROVIDER_ID,
   TELEGRAM_OIDC_TOKEN_ENDPOINT,
 } from "./constants";
+import { rememberOIDCSubject } from "./oidc-request-state";
 import type { TelegramOIDCClaims, TelegramOIDCOptions } from "./types";
+import { omitProtectedUserFields } from "./user-mapper";
 
 /** Build Telegram scopes, always retaining the required openid scope. */
 export function buildScopes(options: TelegramOIDCOptions): string[] {
-  const scopes = new Set(["openid", ...(options.scopes ?? ["profile"])]);
+  const scopes = new Set(["openid"]);
+  if (!options.disableDefaultScope) {
+    scopes.add("profile");
+  }
+  for (const scope of options.scopes ?? []) {
+    scopes.add(scope);
+  }
   if (options.requestPhone) {
     scopes.add("phone");
   }
@@ -43,6 +51,7 @@ export function createTelegramOIDCProvider(
   const providerOptions = {
     clientId,
     clientSecret: options.clientSecret,
+    disableIdTokenSignIn: options.disableIdTokenSignIn,
     disableImplicitSignUp: options.disableImplicitSignUp,
     disableSignUp: options.disableSignUp,
   };
@@ -98,7 +107,9 @@ export function createTelegramOIDCProvider(
       } catch {
         return null;
       }
-      const mapped = options.mapOIDCProfileToUser?.(claims);
+      await rememberOIDCSubject(claims.sub);
+      const mapped = await options.mapOIDCProfileToUser?.(claims);
+      const mappedFields = omitProtectedUserFields(mapped);
       return {
         data: claims,
         user: {
@@ -107,8 +118,8 @@ export function createTelegramOIDCProvider(
             claims.name ??
             claims.preferred_username ??
             `Telegram ${claims.sub}`,
-          ...mapped,
-          email: mapped?.email ?? `${claims.sub}@telegram.oidc`,
+          ...mappedFields,
+          email: mappedFields.email ?? `${claims.sub}@telegram.oidc`,
           // Identity cannot be replaced by mutable profile mapping.
           emailVerified: false,
         },
@@ -117,6 +128,9 @@ export function createTelegramOIDCProvider(
     id: TELEGRAM_OIDC_PROVIDER_ID,
     idToken: {
       verify: async (token, nonce) => {
+        if (!nonce) {
+          return false;
+        }
         try {
           await verify(token, nonce);
           return true;

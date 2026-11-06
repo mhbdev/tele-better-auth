@@ -1,7 +1,9 @@
 import {
   APIError,
   createAuthEndpoint,
+  formCsrfMiddleware,
   freshSessionMiddleware,
+  sensitiveSessionMiddleware,
   sessionMiddleware,
 } from "better-auth/api";
 import { ERROR_CODES } from "./constants";
@@ -20,7 +22,7 @@ export function createWidgetEndpoints(config: TelegramPluginConfig) {
       "/telegram/link",
       {
         method: "POST",
-        use: [sessionMiddleware],
+        use: [sessionMiddleware, sensitiveSessionMiddleware],
       },
       async (ctx) => {
         if (!config.allowUserToLink) {
@@ -43,7 +45,11 @@ export function createWidgetEndpoints(config: TelegramPluginConfig) {
     ),
     signInWithTelegram: createAuthEndpoint(
       "/telegram/signin",
-      { method: "POST" },
+      {
+        method: "POST",
+        // Prevent cross-site first-login requests with no session cookie.
+        use: [formCsrfMiddleware],
+      },
       async (ctx) => {
         const data = await ctx.body;
         if (!validateTelegramAuthData(data)) {
@@ -61,7 +67,7 @@ export function createWidgetEndpoints(config: TelegramPluginConfig) {
           ctx,
           config,
           data,
-          config.mapTelegramDataToUser?.(data),
+          await config.mapTelegramDataToUser?.(data),
           true,
           ERROR_CODES.USER_CREATION_DISABLED
         );
@@ -71,7 +77,11 @@ export function createWidgetEndpoints(config: TelegramPluginConfig) {
       "/telegram/unlink",
       {
         method: "POST",
-        use: [sessionMiddleware, freshSessionMiddleware],
+        use: [
+          sessionMiddleware,
+          sensitiveSessionMiddleware,
+          freshSessionMiddleware,
+        ],
       },
       unlinkTelegramIdentity
     ),

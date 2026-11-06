@@ -5,6 +5,26 @@ All notable changes to the tele-better-auth plugin will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-11-07
+
+### Security
+
+- Require Better Auth 1.7.17 or newer in the 1.x release line so session-protected link and unlink routes use the fixed authoritative-session checks.
+- Validate browser origins on first-time Widget and Mini App sign-ins, and re-check Telegram account ownership after application hooks before issuing a session.
+- Reject client-submitted OIDC ID tokens without a matching nonce.
+- Keep Better Auth user IDs and Telegram email-verification state outside mapper control.
+
+### Added
+
+- Support asynchronous Widget, Mini App, and OIDC user mappers.
+- Read Mini App launch data from Telegram's `tgWebAppData` URL fragment when the WebApp SDK is unavailable.
+- Add current Mini App data fields, OIDC claims, configurable default profile scope, and the option to disable client-submitted ID-token sign-in.
+
+### Changed
+
+- Update runtime and development dependencies to their current registry releases and refresh the lint configuration for Ultracite 8.
+- Update the legacy Login Widget script URL to version 24.
+
 ## [1.7.1] - 2026-10-09
 
 ### Fixed

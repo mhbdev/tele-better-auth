@@ -596,7 +596,7 @@ describe.skipIf(!distExists)("Module augmentation in built output", () => {
         .join("\n");
 
     // Verify the augmentation references the exact module
-    const moduleRegex = /declare module "@better-auth\/core"/;
+    const moduleRegex = /declare module "@better-auth\/core"/u;
     expect(moduleRegex.test(dtsContent)).toBe(true);
 
     // Make sure the creator is typed, not just `any`
@@ -625,7 +625,7 @@ describe.skipIf(!distExists)("Module augmentation in built output", () => {
 
     // Extract the augmentation blocks
     const augmentationPattern =
-      /declare module "@better-auth\/core"\s*\{[\s\S]*?BetterAuthPluginRegistry[\s\S]*?\}/;
+      /declare module "@better-auth\/core"\s*\{[\s\S]*?BetterAuthPluginRegistry[\s\S]*?\}/u;
 
     const dtsMatch = dtsContent.match(augmentationPattern);
     const dctsMatch = dctsContent.match(augmentationPattern);

@@ -53,7 +53,7 @@ function isFresh(authDate: number, maxAge: number): boolean {
 }
 
 function equalHash(expected: string, received: string): boolean {
-  if (!/^[a-f0-9]{64}$/.test(received)) {
+  if (!/^[a-f0-9]{64}$/u.test(received)) {
     return false;
   }
   let difference = 0;

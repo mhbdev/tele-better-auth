@@ -15,6 +15,7 @@ export interface TelegramAuthData {
  * User object from Telegram Mini Apps
  */
 export interface TelegramMiniAppUser {
+  added_to_attachment_menu?: boolean;
   allows_write_to_pm?: boolean;
   first_name: string;
   id: number;
@@ -45,10 +46,13 @@ export interface TelegramMiniAppData {
   can_send_after?: number;
   chat?: TelegramMiniAppChat;
   chat_instance?: string;
+  chat_join_request_query_id?: string;
   chat_type?: "sender" | "private" | "group" | "supergroup" | "channel";
   hash: string;
   query_id?: string;
   receiver?: TelegramMiniAppUser;
+  /** Ed25519 signature for third-party verification; included in the bot-token HMAC payload. */
+  signature?: string;
   start_param?: string;
   user?: TelegramMiniAppUser;
 }
@@ -57,10 +61,12 @@ export interface TelegramMiniAppData {
  * JWT ID token claims from Telegram OIDC
  */
 export interface TelegramOIDCClaims {
-  aud: string;
+  aud: string | string[];
   exp: number;
+  family_name?: string;
+  given_name?: string;
   iat: number;
-  id?: number;
+  id?: number | string;
   iss: string;
   name?: string;
   nonce?: string;
@@ -70,6 +76,22 @@ export interface TelegramOIDCClaims {
   preferred_username?: string;
   sub: string;
 }
+
+/**
+ * User profile fields returned by a Telegram data mapper. Better Auth's `id`
+ * and `emailVerified` fields are ignored; Telegram does not verify email.
+ */
+export interface TelegramMappedUser {
+  email?: string;
+  image?: string;
+  name?: string;
+  [key: string]: any;
+}
+
+/** Mapper functions may perform asynchronous lookups or validation. */
+export type TelegramUserMapper<T> = (
+  data: T
+) => TelegramMappedUser | Promise<TelegramMappedUser>;
 
 /**
  * Configuration options for Telegram OIDC authentication
@@ -92,6 +114,10 @@ export interface TelegramOIDCOptions {
    * Required when OIDC is enabled. The bot token is never used as a fallback.
    */
   clientSecret?: string;
+  /** Omit Telegram's default profile scope; `openid` is always requested. */
+  disableDefaultScope?: boolean;
+  /** Reject client-submitted ID-token sign-in and link requests. */
+  disableIdTokenSignIn?: boolean;
   /** Require explicit signup intent for new OIDC users. */
   disableImplicitSignUp?: boolean;
   /** Disable new OIDC users, while allowing existing accounts to sign in. */
@@ -106,12 +132,7 @@ export interface TelegramOIDCOptions {
   /**
    * Custom function to map OIDC claims to user object
    */
-  mapOIDCProfileToUser?: (claims: TelegramOIDCClaims) => {
-    name?: string;
-    email?: string;
-    image?: string;
-    [key: string]: any;
-  };
+  mapOIDCProfileToUser?: TelegramUserMapper<TelegramOIDCClaims>;
 
   /**
    * Request bot access (adds "telegram:bot_access" scope)
@@ -170,12 +191,7 @@ export interface TelegramPluginOptions {
   /**
    * Custom function to map Telegram data to user object
    */
-  mapTelegramDataToUser?: (data: TelegramAuthData) => {
-    name?: string;
-    email?: string;
-    image?: string;
-    [key: string]: any;
-  };
+  mapTelegramDataToUser?: TelegramUserMapper<TelegramAuthData>;
 
   /**
    * Maximum age of auth_date in seconds
@@ -210,12 +226,7 @@ export interface TelegramPluginOptions {
     /**
      * Custom function to map Mini App user data to user object
      */
-    mapMiniAppDataToUser?: (data: TelegramMiniAppUser) => {
-      name?: string;
-      email?: string;
-      image?: string;
-      [key: string]: any;
-    };
+    mapMiniAppDataToUser?: TelegramUserMapper<TelegramMiniAppUser>;
   };
 
   /**

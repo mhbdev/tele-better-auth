@@ -68,18 +68,27 @@ function setup(extra = {}, pluginOptions = {}) {
     secret: "a-reliable-secret-with-at-least-32-characters",
     ...extra,
   });
-  const post = (path: string, body: unknown, cookie = "") =>
-    auth.handler(
+  const post = (
+    path: string,
+    body: unknown,
+    cookie = "",
+    origin = "https://app.test"
+  ) => {
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Origin: origin,
+    });
+    if (cookie) {
+      headers.set("Cookie", cookie);
+    }
+    return auth.handler(
       new Request(`https://app.test/api/auth${path}`, {
         body: JSON.stringify(body),
-        headers: {
-          "Content-Type": "application/json",
-          cookie,
-          Origin: "https://app.test",
-        },
+        headers,
         method: "POST",
       })
     );
+  };
   return { afterCreate, db, post };
 }
 function cookies(response: Response) {
@@ -90,6 +99,79 @@ function cookies(response: Response) {
 }
 
 describe("real Better Auth endpoint integration", () => {
+  it("blocks first-login requests from untrusted browser origins", async () => {
+    const { db, post } = setup({ advanced: { disableOriginCheck: false } });
+    const response = await post(
+      "/telegram/signin",
+      widget(),
+      "",
+      "https://attacker.test"
+    );
+
+    expect(response.status).toBe(403);
+    expect(db.user).toHaveLength(0);
+  });
+  it("blocks untrusted-origin Mini App sign-in before creating a session", async () => {
+    const { db, post } = setup({ advanced: { disableOriginCheck: false } });
+    const response = await post(
+      "/telegram/miniapp/signin",
+      { initData: miniApp() },
+      "",
+      "https://attacker.test"
+    );
+
+    expect(response.status).toBe(403);
+    expect(db.user).toHaveLength(0);
+  });
+
+  it("does not issue a session if user validation removes the Telegram account", async () => {
+    let signInCalls = 0;
+    const validateUserInfo = vi
+      .fn()
+      .mockImplementation(async ({ source }, ctx) => {
+        if (source.action === "sign-in") {
+          signInCalls += 1;
+          if (signInCalls < 2) {
+            return;
+          }
+          await ctx.context.adapter.delete({
+            model: "account",
+            where: [
+              { field: "accountId", value: "42" },
+              { field: "providerId", value: "telegram" },
+            ],
+          });
+        }
+      });
+    const { db, post } = setup({ user: { validateUserInfo } });
+    const first = await post("/telegram/signin", widget());
+    expect(first.status).toBe(200);
+    const second = await post("/telegram/signin", widget());
+
+    expect(second.status).toBe(401);
+    expect(db.session).toHaveLength(1);
+    expect(db.account).toHaveLength(0);
+  });
+
+  it("does not issue a session if an account creation hook removes the Telegram account", async () => {
+    const { db, post } = setup({
+      databaseHooks: {
+        account: {
+          create: {
+            after: async (account: any, ctx: any) => {
+              await ctx.context.internalAdapter.deleteAccount(account.id);
+            },
+          },
+        },
+      },
+    });
+    const response = await post("/telegram/signin", widget());
+
+    expect(response.status).toBe(401);
+    expect(db.account).toHaveLength(0);
+    expect(db.session).toHaveLength(0);
+  });
+
   it("does not authenticate or update Telegram fields when an account hook rejects linking", async () => {
     const { db, post } = setup({
       databaseHooks: {
@@ -165,6 +247,29 @@ describe("real Better Auth endpoint integration", () => {
       403
     );
     expect(db.account).toHaveLength(1);
+  });
+  it("rejects account linking with a revoked session kept in the cookie cache", async () => {
+    const { db, post } = setup({
+      session: { cookieCache: { enabled: true, maxAge: 300 } },
+    });
+    const signup = await post("/sign-up/email", {
+      email: "revoked@example.com",
+      name: "Revoked",
+      password: "secret-pass-123",
+    });
+    const cookie = cookies(signup);
+    const revoked = await post(
+      "/revoke-session",
+      { token: db.session[0]!.token },
+      cookie
+    );
+    expect(revoked.status).toBe(200);
+    expect(db.session).toHaveLength(0);
+
+    const link = await post("/telegram/link", widget(), cookie);
+    expect(link.status).toBe(401);
+    expect(db.account).toHaveLength(1);
+    expect(db.user[0]!.telegramId).toBeUndefined();
   });
   it("creates complete users, runs hooks, sets cookies and reuses identity across Widget and Mini App", async () => {
     const { db, post, afterCreate } = setup();

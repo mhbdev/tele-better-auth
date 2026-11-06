@@ -16,7 +16,7 @@ Widget/Mini App accounts use numeric Telegram ID; OIDC uses `sub`. Neither usern
 
 New Telegram users have unverified placeholder email addresses. Custom mapped email stays unverified. Never infer email ownership from Telegram, and avoid configuring automatic email linking through a trusted provider.
 
-Links require a session. Unlinking requires a fresh session and cannot remove the last sign-in method by default. Plugin linking policy and Better Auth's global linking policy are enforced. Use database constraints on `(providerId, accountId)` to prevent duplicate ownership under concurrent requests.
+Widget and Mini App first sign-in requests validate browser origins even when no session cookie exists, preventing login CSRF. Link and unlink require an authoritative, unrevoked session, so a revoked session cached in a cookie cannot change account links. Unlinking also requires a fresh session and cannot remove the last sign-in method by default. Plugin linking policy and Better Auth's global linking policy are enforced. Use database constraints on `(providerId, accountId)` to prevent duplicate ownership under concurrent requests.
 
 ## Deployment
 

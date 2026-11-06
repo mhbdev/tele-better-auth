@@ -1,5 +1,6 @@
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { deleteSessionCookie } from "better-auth/cookies";
 import { createConfigEndpoint } from "./config-endpoint";
 import { ERROR_CODES, PLUGIN_ID } from "./constants";
 import {
@@ -7,6 +8,7 @@ import {
   getMiniAppRateLimits,
 } from "./miniapp-endpoints";
 import { createTelegramOIDCProvider } from "./oidc";
+import { currentOIDCSubject } from "./oidc-request-state";
 import { createPluginConfig } from "./plugin-config";
 import { createTelegramSchema } from "./schema";
 import type { TelegramPluginOptions } from "./types";
@@ -18,12 +20,14 @@ export type { TelegramPluginConfig } from "./plugin-config";
 export type {
   TelegramAccountRecord,
   TelegramAuthData,
+  TelegramMappedUser,
   TelegramMiniAppChat,
   TelegramMiniAppData,
   TelegramMiniAppUser,
   TelegramOIDCClaims,
   TelegramOIDCOptions,
   TelegramPluginOptions,
+  TelegramUserMapper,
 } from "./types";
 
 /**
@@ -46,6 +50,35 @@ export type {
  */
 export const telegram = (options: TelegramPluginOptions) => {
   const config = createPluginConfig(options);
+  const oidcSessionGuard = {
+    handler: createAuthMiddleware(async (ctx) => {
+      const issued = ctx.context.newSession;
+      if (!issued) {
+        return;
+      }
+      const subject = await currentOIDCSubject();
+      if (!subject) {
+        return;
+      }
+      const account = await ctx.context.adapter.findOne({
+        model: "account",
+        where: [
+          { field: "providerId", value: "telegram-oidc" },
+          { field: "accountId", value: subject },
+          { field: "userId", value: issued.user.id },
+        ],
+      });
+      if (!account) {
+        await ctx.context.internalAdapter.deleteSession(issued.session.token);
+        deleteSessionCookie(ctx);
+        throw APIError.from("UNAUTHORIZED", ERROR_CODES.INVALID_AUTHENTICATION);
+      }
+    }),
+    matcher: (ctx: { body?: { provider?: string }; path?: string }) =>
+      ctx.path === "/callback/telegram-oidc" ||
+      (ctx.path === "/sign-in/social" &&
+        ctx.body?.provider === "telegram-oidc"),
+  };
 
   return {
     hooks: {
@@ -62,6 +95,7 @@ export const telegram = (options: TelegramPluginOptions) => {
             ctx.body?.provider === "telegram-oidc",
         },
       ],
+      ...(config.oidcEnabled ? { after: [oidcSessionGuard] } : {}),
     },
     id: PLUGIN_ID,
 

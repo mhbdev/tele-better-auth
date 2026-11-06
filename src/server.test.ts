@@ -35,7 +35,9 @@ vi.mock("better-auth/api", () => {
       (_path: string, _options: any, handler: any) => handler
     ),
     createAuthMiddleware: (handler: any) => handler,
+    formCsrfMiddleware: {},
     freshSessionMiddleware: {},
+    sensitiveSessionMiddleware: {},
     sessionMiddleware: {},
   };
 });
@@ -76,6 +78,7 @@ const TELEGRAM_USER_ID = "830000001";
  * because the user already exists.
  */
 function createOIDCUserAdapter() {
+  let persistedTelegramAccount: any;
   const oidcUser = {
     email: `${TELEGRAM_USER_ID}@telegram.oidc`,
     id: "user-oidc-123",
@@ -98,6 +101,20 @@ function createOIDCUserAdapter() {
     delete: vi.fn(),
     findOne: vi.fn(({ model, where }: any) => {
       if (model === "account") {
+        if (
+          persistedTelegramAccount &&
+          where?.some(
+            (condition: any) =>
+              condition.field === "providerId" && condition.value === "telegram"
+          ) &&
+          where?.some(
+            (condition: any) =>
+              condition.field === "accountId" &&
+              condition.value === persistedTelegramAccount.accountId
+          )
+        ) {
+          return Promise.resolve(persistedTelegramAccount);
+        }
         // Only a telegram-oidc account exists, NOT a telegram account.
         // The endpoint queries providerId="telegram" — it won't find this.
         return Promise.resolve(null);
@@ -119,6 +136,9 @@ function createOIDCUserAdapter() {
       }
       return Promise.resolve(null);
     }),
+    setPersistedTelegramAccount: (account: any) => {
+      persistedTelegramAccount = account;
+    },
 
     update: vi.fn(),
   };
@@ -132,11 +152,17 @@ function createMockContext(adapter: any, body: any) {
       internalAdapter: {
         createOAuthUser: async (user: any, account: any) => {
           const created = await adapter.create({ data: user, model: "user" });
+          const accountRecord = await adapter.create({
+            data: { ...account, userId: created.id },
+            model: "account",
+          });
+          adapter.setPersistedTelegramAccount({
+            ...accountRecord,
+            ...account,
+            userId: created.id,
+          });
           return {
-            account: await adapter.create({
-              data: { ...account, userId: created.id },
-              model: "account",
-            }),
+            account: accountRecord,
             user: created,
           };
         },
@@ -159,7 +185,14 @@ function createMockContext(adapter: any, body: any) {
             model: "user",
             where: [{ field: "id", value: id }],
           }),
-        linkAccount: (data: any) => adapter.create({ data, model: "account" }),
+        linkAccount: async (data: any) => {
+          const accountRecord = await adapter.create({
+            data,
+            model: "account",
+          });
+          adapter.setPersistedTelegramAccount({ ...accountRecord, ...data });
+          return accountRecord;
+        },
         updateUser: (id: string, update: any) =>
           adapter.update({
             model: "user",

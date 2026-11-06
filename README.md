@@ -9,7 +9,7 @@ Use Telegram OIDC for new web integrations, the legacy Login Widget for existing
 
 ## Requirements
 
-- Better Auth **1.7.7 or later in the 1.x release line**.
+- Better Auth **1.7.17 or later in the 1.x release line**.
 - Node.js **22.12+**, or a compatible runtime with Web Crypto and Fetch. Repository tooling uses Node 22.18+, 24.11+, or 26+.
 - A configured Better Auth database and mounted auth handler.
 - Telegram credentials from [BotFather](https://t.me/BotFather). Keep all secrets on the server.
@@ -179,7 +179,7 @@ const linked = await authClient.linkMiniApp(window.Telegram.WebApp.initData);
 const validation = await authClient.validateMiniApp(window.Telegram.WebApp.initData);
 ```
 
-`autoSignInFromMiniApp()` reads the raw `initData` for you. Mini App authentication and linking always verify HMAC and timestamp, even if an old internal config disables verification. Configuring `miniApp.validateInitData: false` now throws. `miniApp.allowAutoSignin: false` prevents creating new Mini App users; existing linked users can still sign in.
+`autoSignInFromMiniApp()` reads raw `initData` from Telegram's SDK, or from its signed launch URL fragment before the SDK loads. Mini App authentication and linking always verify HMAC and timestamp. `miniApp.allowAutoSignin: false` prevents creating new Mini App users; existing linked users can still sign in. See [Mini App deployment notes](docs/miniapps.md) for cross-origin and Telegram Web cookie configuration.
 
 ## Configuration and account controls
 
@@ -187,7 +187,7 @@ const validation = await authClient.validateMiniApp(window.Telegram.WebApp.initD
 - `autoCreateUser` defaults to `true`; `false` rejects unregistered identities. OIDC also accepts `disableSignUp` and `disableImplicitSignUp`.
 - `maxAuthAge` defaults to 86,400 seconds. Use a shorter interval for your use case. Invalid, expired, and future timestamps are rejected. Signed data can be reused during this interval; HMAC validation alone is not single-use replay protection.
 - `mapTelegramDataToUser`, `miniApp.mapMiniAppDataToUser`, and `oidc.mapOIDCProfileToUser` customize mutable local profile fields. Placeholder emails are unverified, including after custom mapping. OIDC account identity always comes from verified `sub`.
-- OIDC defaults to scopes `openid profile` and algorithm `RS256`. Set `scopes`, `requestPhone`, `requestBotAccess`, or `algorithms: ["ES256"]` to match BotFather. `EdDSA` is supported where the runtime supports Ed25519; Telegram restricts it to `openid`. `ES256K` is not supported by this Web Crypto implementation.
+- OIDC defaults to scopes `openid profile` and algorithm `RS256`. Set `scopes`, `requestPhone`, `requestBotAccess`, or `algorithms: ["ES256"]` to match BotFather. `scopes` adds to the defaults; set `disableDefaultScope: true` to omit `profile`. `EdDSA` is supported where the runtime supports Ed25519; Telegram restricts it to `openid`. `ES256K` is not supported by this Web Crypto implementation.
 - `telegramClient({ scriptNonce, scriptTimeoutMs })` supports a CSP nonce and bounded script loading. Failed loads are removed for retry. Every network helper accepts typed fetch options for headers, credentials, cancellation, and hooks.
 
 Unlink Widget/Mini App accounts with `unlinkTelegram()` or `unlinkMiniApp()`. Both remove provider `telegram`, clear its profile fields, and reject removal of the last account unless your app explicitly allows `accountLinking.allowUnlinkingAll`. Unlink OIDC with Better Auth's `unlinkAccount({ accountId })`, using the local account row ID from `listAccounts()`.
@@ -196,7 +196,7 @@ Use native buttons, visible focus styles, a disabled/busy state while starting a
 
 ## Upgrading to 1.7
 
-This minor release retains the client helpers and the two package export paths. It requires Better Auth 1.7.7 and includes deliberate security corrections: the invalid bot-token OIDC-secret fallback and unverified Mini App authentication are removed. Unlinking now protects the last account. OIDC providers use the current `idToken` and `accountSubject` API. Custom standalone provider integrations must use Better Auth's `verifyProviderIdToken()` instead of the removed provider `verifyIdToken` method.
+This release requires Better Auth 1.7.17 or later in the 1.x line. OIDC providers use the current `idToken` and `accountSubject` API. Custom standalone provider integrations must use Better Auth's `verifyProviderIdToken()` instead of the removed provider `verifyIdToken` method.
 
 See [migration and configuration](docs/configuration.md), [API reference](docs/api-reference.md), [security](docs/security.md), and [troubleshooting](docs/troubleshooting.md).
 

@@ -1,7 +1,9 @@
 import {
   APIError,
   createAuthEndpoint,
+  formCsrfMiddleware,
   freshSessionMiddleware,
+  sensitiveSessionMiddleware,
   sessionMiddleware,
 } from "better-auth/api";
 import { ERROR_CODES } from "./constants";
@@ -50,7 +52,7 @@ export function createMiniAppEndpoints(config: TelegramPluginConfig) {
       "/telegram/miniapp/link",
       {
         method: "POST",
-        use: [sessionMiddleware],
+        use: [sessionMiddleware, sensitiveSessionMiddleware],
       },
       async (ctx) => {
         const user = await verifiedData(await ctx.body, config);
@@ -59,14 +61,18 @@ export function createMiniAppEndpoints(config: TelegramPluginConfig) {
     ),
     signInWithMiniApp: createAuthEndpoint(
       "/telegram/miniapp/signin",
-      { method: "POST" },
+      {
+        method: "POST",
+        // Validate browser origin even for first sign-in without cookies.
+        use: [formCsrfMiddleware],
+      },
       async (ctx) => {
         const user = await verifiedData(await ctx.body, config);
         return signInTelegramIdentity(
           ctx,
           config,
           user,
-          config.mapMiniAppDataToUser?.(user),
+          await config.mapMiniAppDataToUser?.(user),
           config.miniAppAllowAutoSignin,
           ERROR_CODES.MINI_APP_AUTO_SIGNIN_DISABLED
         );
@@ -77,7 +83,11 @@ export function createMiniAppEndpoints(config: TelegramPluginConfig) {
       "/telegram/miniapp/unlink",
       {
         method: "POST",
-        use: [sessionMiddleware, freshSessionMiddleware],
+        use: [
+          sessionMiddleware,
+          sensitiveSessionMiddleware,
+          freshSessionMiddleware,
+        ],
       },
       unlinkTelegramIdentity
     ),

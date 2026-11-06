@@ -24,6 +24,8 @@ The exported TypeScript interfaces describe the complete API. Keep secrets in th
 | `oidc.requestPhone` | `false` | Add `phone` scope. |
 | `oidc.requestBotAccess` | `false` | Add `telegram:bot_access` scope. |
 | `oidc.algorithms` | `["RS256"]` | Allowed JWT algorithms: RS256, ES256 or EdDSA. Match BotFather configuration. |
+| `oidc.disableDefaultScope` | `false` | Keep `openid` but omit the default `profile` scope. |
+| `oidc.disableIdTokenSignIn` | `false` | Reject client-submitted ID-token sign-in/link requests; authorization-code flow remains available. |
 | `oidc.disableSignUp` | inverse of `autoCreateUser` | Override OIDC user creation policy. |
 | `oidc.disableImplicitSignUp` | `false` | Require an explicit signup request for new OIDC users. |
 | `oidc.mapOIDCProfileToUser` | name and picture | Map verified claims. Identity always uses `sub`; mapped email remains unverified. |

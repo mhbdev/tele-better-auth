@@ -1,6 +1,6 @@
 {
   "name": "tele-better-auth",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Telegram authentication plugin for Better Auth",
   "keywords": [
     "better-auth",
@@ -74,25 +74,25 @@
     ]
   },
   "dependencies": {
-    "jose": "6.2.12"
+    "jose": "6.2.15"
   },
   "devDependencies": {
-    "@better-auth/core": "1.7.7",
-    "@biomejs/biome": "2.5.15",
-    "@types/node": "26.6.4",
-    "@vitest/coverage-v8": "5.0.3",
-    "@vitest/ui": "5.0.3",
-    "better-auth": "1.7.7",
-    "happy-dom": "20.14.6",
+    "@better-auth/core": "1.7.18",
+    "@biomejs/biome": "2.6.6",
+    "@types/node": "26.6.6",
+    "@vitest/coverage-v8": "5.1.0",
+    "@vitest/ui": "5.1.0",
+    "better-auth": "1.7.18",
+    "happy-dom": "21.0.4",
     "lint-staged": "17.6.0",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.7",
     "typescript": "7.0.2",
-    "ultracite": "7.12.4",
-    "vitest": "5.0.3"
+    "ultracite": "8.1.1",
+    "vitest": "5.1.0"
   },
   "peerDependencies": {
-    "@better-auth/core": "^1.7.7",
-    "better-auth": "^1.7.7"
+    "@better-auth/core": "^1.7.17",
+    "better-auth": "^1.7.17"
   },
   "engines": {
     "node": ">=22.12.0"

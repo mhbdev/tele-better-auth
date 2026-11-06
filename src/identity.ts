@@ -5,7 +5,8 @@ import { APIError } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { ERROR_CODES, PLUGIN_ID, SUCCESS_MESSAGES } from "./constants";
 import type { TelegramPluginConfig } from "./plugin-config";
-import type { TelegramAccountRecord } from "./types";
+import type { TelegramAccountRecord, TelegramMappedUser } from "./types";
+import { omitProtectedUserFields } from "./user-mapper";
 
 interface TelegramIdentity {
   first_name: string;
@@ -13,13 +14,6 @@ interface TelegramIdentity {
   last_name?: string;
   photo_url?: string;
   username?: string;
-}
-
-interface UserMapping {
-  email?: string;
-  image?: string;
-  name?: string;
-  [key: string]: any;
 }
 
 function accountData(identity: TelegramIdentity) {
@@ -74,7 +68,7 @@ export async function signInTelegramIdentity(
   ctx: GenericEndpointContext,
   config: TelegramPluginConfig,
   identity: TelegramIdentity,
-  mapped: UserMapping | undefined,
+  mapped: TelegramMappedUser | undefined,
   allowCreate: boolean,
   creationError: { code: string; message: string }
 ) {
@@ -106,13 +100,14 @@ export async function signInTelegramIdentity(
       if (!(allowCreate && config.autoCreateUser)) {
         throw APIError.from("NOT_FOUND", creationError);
       }
+      const mappedFields = omitProtectedUserFields(mapped);
       const userData = {
         image: identity.photo_url,
         name: [identity.first_name, identity.last_name]
           .filter(Boolean)
           .join(" "),
-        ...mapped,
-        email: mapped?.email ?? `${identity.id}@telegram.invalid`,
+        ...mappedFields,
+        email: mappedFields.email ?? `${identity.id}@telegram.invalid`,
         emailVerified: false,
         telegramId: String(identity.id),
         telegramUsername: identity.username,
@@ -141,6 +136,19 @@ export async function signInTelegramIdentity(
     throw APIError.from("UNAUTHORIZED", ERROR_CODES.INVALID_AUTHENTICATION);
   }
   await validateUser(ctx, user, "sign-in", identity);
+  // Application hooks may remove or reassign the account while authentication
+  // is in flight. Only issue a session if the proof is still bound to this user.
+  const currentAccount =
+    await ctx.context.adapter.findOne<TelegramAccountRecord>({
+      model: "account",
+      where: [
+        { field: "providerId", value: PLUGIN_ID },
+        { field: "accountId", value: String(identity.id) },
+      ],
+    });
+  if (!currentAccount || currentAccount.userId !== user.id) {
+    throw APIError.from("UNAUTHORIZED", ERROR_CODES.INVALID_AUTHENTICATION);
+  }
   const session = await ctx.context.internalAdapter.createSession(user.id);
   if (!session) {
     throw APIError.from("UNAUTHORIZED", ERROR_CODES.INVALID_AUTHENTICATION);

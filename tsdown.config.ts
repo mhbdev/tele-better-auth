@@ -5,9 +5,9 @@ export default defineConfig({
   deps: {
     neverBundle: [
       "better-auth",
-      /^better-auth\//,
+      /^better-auth\//u,
       "@better-auth/core",
-      /^@better-auth\/core\//,
+      /^@better-auth\/core\//u,
       "jose",
       "@better-fetch/fetch",
       "better-call",
