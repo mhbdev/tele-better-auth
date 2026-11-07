@@ -4,6 +4,7 @@ import type { TelegramAuthData, TelegramMiniAppData } from "./types";
 import {
   parseMiniAppInitData,
   validateMiniAppData,
+  validateMiniAppInitDataPayload,
   validateTelegramAuthData,
   verifyMiniAppInitData,
   verifyTelegramAuth,
@@ -734,6 +735,20 @@ describe("verifyMiniAppInitData", () => {
       const result = await verifyMiniAppInitData(initData, BotToken);
 
       expect(result).toBe(false);
+    });
+
+    it("validates freshness and payload shape without verifying a bot token", () => {
+      expect(validateMiniAppInitDataPayload(createValidInitData())).toBe(true);
+      expect(
+        validateMiniAppInitDataPayload(
+          `${createValidInitData()}&auth_date=${Math.floor(Date.now() / 1000)}`
+        )
+      ).toBe(false);
+      expect(
+        validateMiniAppInitDataPayload(
+          createValidInitData(Math.floor(Date.now() / 1000) - 90_000)
+        )
+      ).toBe(false);
     });
 
     it("should return false for invalid hash", async () => {

@@ -40,6 +40,7 @@ vi.mock("better-auth/cookies", () => ({
 vi.mock("./verify", () => ({
   parseMiniAppInitData: vi.fn(),
   validateMiniAppData: vi.fn(),
+  validateMiniAppInitDataPayload: vi.fn(),
   verifyMiniAppInitData: vi.fn(),
 }));
 
@@ -52,11 +53,13 @@ import type { TelegramPluginConfig } from "./plugin-config";
 import {
   parseMiniAppInitData,
   validateMiniAppData,
+  validateMiniAppInitDataPayload,
   verifyMiniAppInitData,
 } from "./verify";
 
 const mockedVerify = vi.mocked(verifyMiniAppInitData);
 const mockedParse = vi.mocked(parseMiniAppInitData);
+const mockedValidatePayload = vi.mocked(validateMiniAppInitDataPayload);
 const mockedValidate = vi.mocked(validateMiniAppData);
 
 const INIT_DATA = "user=%7B%22id%22%3A99%7D&auth_date=1700000000&hash=abc";
@@ -72,6 +75,21 @@ const PARSED_DATA = {
     username: "bobjones",
   },
 };
+
+function freshInitData() {
+  const data = {
+    ...PARSED_DATA,
+    auth_date: Math.floor(Date.now() / 1000),
+    hash: "a".repeat(64),
+  };
+  mockedParse.mockReturnValue(data as any);
+  const params = new URLSearchParams({
+    auth_date: String(data.auth_date),
+    hash: data.hash,
+    user: JSON.stringify(data.user),
+  });
+  return { data, initData: params.toString() };
+}
 
 function makeConfig(
   overrides: Partial<TelegramPluginConfig> = {}
@@ -193,6 +211,7 @@ describe("signInWithMiniApp", () => {
     vi.clearAllMocks();
     mockedVerify.mockResolvedValue(true);
     mockedParse.mockReturnValue(PARSED_DATA as any);
+    mockedValidatePayload.mockReturnValue(true);
     mockedValidate.mockReturnValue(true);
   });
 
@@ -222,6 +241,71 @@ describe("signInWithMiniApp", () => {
     await expect((endpoints.signInWithMiniApp as any)(ctx)).rejects.toThrow(
       ERROR_CODES.INVALID_MINI_APP_INIT_DATA.message
     );
+  });
+
+  it("uses the server verifier with raw initData, request context, and extra body fields", async () => {
+    const { data, initData } = freshInitData();
+    const verifier = vi.fn().mockResolvedValue(data.user);
+    const endpoints = createMiniAppEndpoints(
+      makeConfig({ botToken: "", verifyMiniAppInitData: verifier })
+    );
+    const ctx = mockCtx(mockAdapter(), {
+      campaignSlug: "spring-sale",
+      initData,
+    });
+    (ctx as any).request = new Request("https://publisher.example/miniapp");
+
+    await (endpoints.signInWithMiniApp as any)(ctx);
+
+    expect(verifier).toHaveBeenCalledWith(initData, ctx, {
+      campaignSlug: "spring-sale",
+    });
+    expect(mockedVerify).not.toHaveBeenCalled();
+    expect(ctx.context.internalAdapter.createSession).toHaveBeenCalledOnce();
+  });
+
+  it("accepts verified full data from the server verifier", async () => {
+    const { data, initData } = freshInitData();
+    const verifier = vi.fn().mockResolvedValue(data);
+    const endpoints = createMiniAppEndpoints(
+      makeConfig({ verifyMiniAppInitData: verifier })
+    );
+    const ctx = mockCtx(mockAdapter(), { initData });
+
+    await (endpoints.signInWithMiniApp as any)(ctx);
+
+    expect(ctx.context.internalAdapter.createSession).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a verifier result for a different Mini App user", async () => {
+    const { initData } = freshInitData();
+    const verifier = vi.fn().mockResolvedValue({
+      first_name: "Mallory",
+      id: 100,
+    });
+    const endpoints = createMiniAppEndpoints(
+      makeConfig({ verifyMiniAppInitData: verifier })
+    );
+    const ctx = mockCtx(mockAdapter(), { initData });
+
+    await expect((endpoints.signInWithMiniApp as any)(ctx)).rejects.toThrow(
+      ERROR_CODES.INVALID_MINI_APP_INIT_DATA.message
+    );
+    expect(ctx.context.internalAdapter.createSession).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the custom verifier declines initData", async () => {
+    const { initData } = freshInitData();
+    const verifier = vi.fn().mockResolvedValue(false);
+    const endpoints = createMiniAppEndpoints(
+      makeConfig({ verifyMiniAppInitData: verifier })
+    );
+    const ctx = mockCtx(mockAdapter(), { initData });
+
+    await expect((endpoints.signInWithMiniApp as any)(ctx)).rejects.toThrow(
+      ERROR_CODES.INVALID_MINI_APP_INIT_DATA.message
+    );
+    expect(ctx.context.internalAdapter.createSession).not.toHaveBeenCalled();
   });
 
   it("verifies even when a legacy config disables validation", async () => {
@@ -520,6 +604,25 @@ describe("validateMiniApp", () => {
     await (endpoints.validateMiniApp as any)(ctx);
 
     expect(mockedVerify).toHaveBeenCalledWith(INIT_DATA, "x:y", 123);
+  });
+
+  it("validates publisher-owned Mini Apps through the custom verifier", async () => {
+    const { data, initData } = freshInitData();
+    const verifier = vi.fn().mockResolvedValue(data);
+    const endpoints = createMiniAppEndpoints(
+      makeConfig({ botToken: "", verifyMiniAppInitData: verifier })
+    );
+    const ctx = mockCtx(mockAdapter(), {
+      campaignSlug: "spring-sale",
+      initData,
+    });
+
+    await (endpoints.validateMiniApp as any)(ctx);
+
+    expect(verifier).toHaveBeenCalledWith(initData, ctx, {
+      campaignSlug: "spring-sale",
+    });
+    expect(ctx.json).toHaveBeenCalledWith({ data, valid: true });
   });
 });
 

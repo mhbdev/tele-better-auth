@@ -1,6 +1,6 @@
 # API reference
 
-Server exports: `telegram`, `createTelegramOIDCProvider`, `telegramOAuth`, and Telegram data/configuration types. Browser exports: `telegramClient` and its options/result types.
+Server exports: `telegram`, `createTelegramOIDCProvider`, `telegramOAuth`, Mini App parse/validation/verification helpers, and Telegram data/configuration types. Browser exports: `telegramClient` and its options/result types.
 
 ## HTTP endpoints
 
@@ -18,6 +18,8 @@ Paths are relative to Better Auth's base path, normally `/api/auth`.
 | POST | `/telegram/miniapp/unlink` | fresh session | Unlink the shared identity |
 
 Widget routes require `loginWidget !== false`; Mini App routes require `miniApp.enabled`. Mini App POST bodies contain `{ initData: string }`. Widget sign-in/link bodies are the original signed `TelegramAuthData`. Unlink actions need no body.
+
+`miniApp.verifyInitData(initData, context, extraFields)` is an optional server-only verifier. `extraFields` contains body fields other than `initData`; both it and `context.body` are untrusted request input. Return verified `TelegramMiniAppData` or `TelegramMiniAppUser`, or a falsy result to reject. The callback is used for Mini App sign-in, linking, and validation; without it, routes use `botToken` HMAC verification. `verifyMiniAppInitData`, `parseMiniAppInitData`, and `validateMiniAppData` are exported for server-side verifier implementations.
 
 OIDC and Generic OAuth use Better Auth's social endpoints with `provider: "telegram-oidc"`: `POST /sign-in/social`, `POST /link-social`, `GET /callback/telegram-oidc`. Client-submitted ID tokens must include the nonce they carry. Use the core `/unlink-account` endpoint to unlink OIDC.
 

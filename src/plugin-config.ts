@@ -1,6 +1,7 @@
 import { DEFAULT_MAX_AUTH_AGE, ERROR_CODES } from "./constants";
 import type {
   TelegramAuthData,
+  TelegramMiniAppInitDataVerifier,
   TelegramMiniAppUser,
   TelegramOIDCOptions,
   TelegramPluginOptions,
@@ -26,6 +27,7 @@ export interface TelegramPluginConfig {
   oidcClientId: string;
   oidcEnabled: boolean;
   testMode: boolean;
+  verifyMiniAppInitData?: TelegramMiniAppInitDataVerifier;
   widgetEnabled: boolean;
 }
 
@@ -49,7 +51,10 @@ export function createPluginConfig(
     testMode = false,
   } = options;
 
-  if ((loginWidget !== false || miniApp?.enabled) && !botToken) {
+  if (
+    (loginWidget !== false || (miniApp?.enabled && !miniApp.verifyInitData)) &&
+    !botToken
+  ) {
     throw new Error(ERROR_CODES.BOT_TOKEN_REQUIRED.message);
   }
 
@@ -94,6 +99,7 @@ export function createPluginConfig(
     oidcClientId,
     oidcEnabled,
     testMode,
+    verifyMiniAppInitData: miniApp?.verifyInitData,
     widgetEnabled,
   };
 }

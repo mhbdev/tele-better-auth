@@ -169,28 +169,13 @@ export async function verifyMiniAppInitData(
   maxAge = DEFAULT_MAX_AUTH_AGE
 ): Promise<boolean> {
   const params = new URLSearchParams(initData);
-  if (new Set(params.keys()).size !== Array.from(params.keys()).length) {
+  if (!validateMiniAppParams(params, maxAge)) {
     return false;
   }
-  const hash = params.get("hash");
-
-  if (!hash) {
-    return false;
-  }
+  const hash = params.get("hash")!;
 
   // Remove hash from params
   params.delete("hash");
-
-  // Check auth_date
-  const authDate = params.get("auth_date");
-  if (!authDate) {
-    return false;
-  }
-
-  const authDateNum = Number(authDate);
-  if (!isFresh(authDateNum, maxAge)) {
-    return false;
-  }
 
   // Create data-check-string (sorted alphabetically)
   const dataCheckString = Array.from(params.entries())
@@ -215,6 +200,32 @@ export async function verifyMiniAppInitData(
 
   // Compare with received hash
   return equalHash(calculatedHash, hash);
+}
+
+/** Validate raw initData structure, hash shape, duplicate keys, and freshness. */
+export function validateMiniAppInitDataPayload(
+  initData: string,
+  maxAge = DEFAULT_MAX_AUTH_AGE
+): boolean {
+  return validateMiniAppParams(new URLSearchParams(initData), maxAge);
+}
+
+function validateMiniAppParams(
+  params: URLSearchParams,
+  maxAge: number
+): boolean {
+  const keys = Array.from(params.keys());
+  if (new Set(keys).size !== keys.length) {
+    return false;
+  }
+  const hash = params.get("hash");
+  const authDate = params.get("auth_date");
+  return Boolean(
+    hash &&
+      /^[a-f0-9]{64}$/u.test(hash) &&
+      authDate &&
+      isFresh(Number(authDate), maxAge)
+  );
 }
 
 /**

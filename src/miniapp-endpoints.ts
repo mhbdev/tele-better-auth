@@ -1,3 +1,4 @@
+import type { GenericEndpointContext } from "@better-auth/core";
 import {
   APIError,
   createAuthEndpoint,
@@ -13,26 +14,92 @@ import {
   unlinkTelegramIdentity,
 } from "./identity";
 import type { TelegramPluginConfig } from "./plugin-config";
+import type {
+  TelegramMiniAppData,
+  TelegramMiniAppVerificationResult,
+} from "./types";
 import {
   parseMiniAppInitData,
   validateMiniAppData,
+  validateMiniAppInitDataPayload,
   verifyMiniAppInitData,
 } from "./verify";
 
 async function verifiedData(
-  body: { initData?: unknown } | undefined,
-  config: TelegramPluginConfig
+  body: Record<string, unknown> | undefined,
+  config: TelegramPluginConfig,
+  ctx: GenericEndpointContext
 ) {
   const initData = body?.initData;
   if (!initData || typeof initData !== "string") {
     throw APIError.from("BAD_REQUEST", ERROR_CODES.INIT_DATA_REQUIRED);
   }
+
+  if (config.verifyMiniAppInitData) {
+    if (!validateMiniAppInitDataPayload(initData, config.maxAuthAge)) {
+      return null;
+    }
+    const extraFields = Object.fromEntries(
+      Object.entries(body ?? {}).filter(([key]) => key !== "initData")
+    );
+    const result = await config.verifyMiniAppInitData(
+      initData,
+      ctx,
+      extraFields
+    );
+    if (result === false || result === null || result === undefined) {
+      return null;
+    }
+
+    const parsed = parseMiniAppInitData(initData);
+    if (!validateMiniAppData(parsed)) {
+      return null;
+    }
+    if (isMiniAppData(result)) {
+      if (
+        !validateMiniAppData(result) ||
+        result.auth_date !== parsed.auth_date ||
+        result.hash !== parsed.hash ||
+        result.user?.id !== parsed.user?.id
+      ) {
+        return null;
+      }
+      return result;
+    }
+
+    if (
+      !parsed.user ||
+      result.id !== parsed.user.id ||
+      !validateMiniAppData({ ...parsed, user: result })
+    ) {
+      return null;
+    }
+    return { ...parsed, user: result };
+  }
+
   if (
     !(await verifyMiniAppInitData(initData, config.botToken, config.maxAuthAge))
   ) {
+    return null;
+  }
+  return parseMiniAppInitData(initData);
+}
+
+function isMiniAppData(
+  result: TelegramMiniAppVerificationResult
+): result is TelegramMiniAppData {
+  return typeof result === "object" && result !== null && "auth_date" in result;
+}
+
+async function verifiedUser(
+  body: Record<string, unknown> | undefined,
+  config: TelegramPluginConfig,
+  ctx: GenericEndpointContext
+) {
+  const data = await verifiedData(body, config, ctx);
+  if (!data) {
     throw APIError.from("UNAUTHORIZED", ERROR_CODES.INVALID_MINI_APP_INIT_DATA);
   }
-  const data = parseMiniAppInitData(initData);
   if (!validateMiniAppData(data)) {
     throw APIError.from(
       "BAD_REQUEST",
@@ -55,7 +122,7 @@ export function createMiniAppEndpoints(config: TelegramPluginConfig) {
         use: [sessionMiddleware, sensitiveSessionMiddleware],
       },
       async (ctx) => {
-        const user = await verifiedData(await ctx.body, config);
+        const user = await verifiedUser(await ctx.body, config, ctx);
         return linkTelegramIdentity(ctx, config, user);
       }
     ),
@@ -67,7 +134,7 @@ export function createMiniAppEndpoints(config: TelegramPluginConfig) {
         use: [formCsrfMiddleware],
       },
       async (ctx) => {
-        const user = await verifiedData(await ctx.body, config);
+        const user = await verifiedUser(await ctx.body, config, ctx);
         return signInTelegramIdentity(
           ctx,
           config,
@@ -95,20 +162,15 @@ export function createMiniAppEndpoints(config: TelegramPluginConfig) {
       "/telegram/miniapp/validate",
       { method: "POST" },
       async (ctx) => {
-        const initData = (await ctx.body)?.initData;
+        const body = await ctx.body;
+        const initData = body?.initData;
         if (!initData || typeof initData !== "string") {
           throw APIError.from("BAD_REQUEST", ERROR_CODES.INIT_DATA_REQUIRED);
         }
-        if (
-          !(await verifyMiniAppInitData(
-            initData,
-            config.botToken,
-            config.maxAuthAge
-          ))
-        ) {
+        const data = await verifiedData(body, config, ctx);
+        if (!data) {
           return ctx.json({ data: null, valid: false });
         }
-        const data = parseMiniAppInitData(initData);
         return ctx.json(
           validateMiniAppData(data)
             ? { data, valid: true }

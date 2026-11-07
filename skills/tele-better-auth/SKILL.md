@@ -78,6 +78,8 @@ Preserve existing trusted providers. Describe the effect of these choices to the
 
 For Widget/Mini App add `botToken` on the server, `botUsername` for Widget, and `miniApp: { enabled: true }` for Mini Apps. Regenerate the auth schema with the project's Better Auth CLI and database migration workflow. These flows add server-owned user fields `telegramId`, `telegramUsername`, `telegramPhoneNumber` and account fields `telegramId`, `telegramUsername`.
 
+For publisher-owned Mini Apps using multiple bots, configure `miniApp.verifyInitData`. It receives raw `initData`, the Better Auth request context, and extra request body fields such as `campaignSlug`; resolve the campaign against an allowlisted origin, then load its bot token from server-side storage and verify the exact payload. The exported `verifyMiniAppInitData`, `parseMiniAppInitData`, and `validateMiniAppData` helpers support this flow. Treat all client fields as untrusted and never select a bot token from a client-provided bot ID. A Mini App-only setup can omit `botToken` when this callback is configured and `loginWidget: false` is set. See the [publisher-owned Mini App guide](https://github.com/mhbdev/tele-better-auth/blob/main/docs/miniapps.md#publisher-owned-mini-apps).
+
 ## Browser behavior
 
 - OIDC sign-in: `signInWithTelegramOIDC({ callbackURL, flow: "redirect" | "popup" })`.

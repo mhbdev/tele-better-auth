@@ -3,7 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it, vi } from "vitest";
-import { telegram } from "./index";
+import { parseMiniAppInitData, telegram, verifyMiniAppInitData } from "./index";
 
 const botToken = "123456789:server-secret";
 function widget(id = 42) {
@@ -23,7 +23,7 @@ function widget(id = 42) {
       .digest("hex"),
   };
 }
-function miniApp(id = 42, overrides = {}) {
+function miniApp(id = 42, overrides = {}, token = botToken) {
   const params = new URLSearchParams({
     auth_date: String(Math.floor(Date.now() / 1000)),
     user: JSON.stringify({ first_name: "Alice", id }),
@@ -37,7 +37,7 @@ function miniApp(id = 42, overrides = {}) {
     "hash",
     createHmac(
       "sha256",
-      createHmac("sha256", "WebAppData").update(botToken).digest()
+      createHmac("sha256", "WebAppData").update(token).digest()
     )
       .update(check)
       .digest("hex")
@@ -122,6 +122,65 @@ describe("real Better Auth endpoint integration", () => {
 
     expect(response.status).toBe(403);
     expect(db.user).toHaveLength(0);
+  });
+
+  it("verifies publisher-owned Mini App data using the server-resolved campaign bot", async () => {
+    const publisherToken = "987654321:publisher-secret";
+    const verifier = vi.fn(async (initData, ctx, fields) => {
+      const { campaignSlug } = fields;
+      if (
+        campaignSlug !== "spring-sale" ||
+        ctx.request.headers.get("origin") !== "https://publisher.example"
+      ) {
+        return false;
+      }
+      if (!(await verifyMiniAppInitData(initData, publisherToken, 600))) {
+        return false;
+      }
+      return parseMiniAppInitData(initData);
+    });
+    const { db, post } = setup(
+      {
+        advanced: { disableOriginCheck: false },
+        trustedOrigins: ["https://publisher.example"],
+      },
+      {
+        botToken: "",
+        loginWidget: false,
+        miniApp: { enabled: true, verifyInitData: verifier },
+      }
+    );
+
+    const accepted = await post(
+      "/telegram/miniapp/signin",
+      {
+        botId: "client-value-is-ignored",
+        campaignSlug: "spring-sale",
+        initData: miniApp(50, {}, publisherToken),
+      },
+      "",
+      "https://publisher.example"
+    );
+    expect(accepted.status).toBe(200);
+    expect((await accepted.json()).user.telegramId).toBe("50");
+    expect(verifier).toHaveBeenCalledOnce();
+    expect(verifier.mock.calls[0]![2]).toEqual({
+      botId: "client-value-is-ignored",
+      campaignSlug: "spring-sale",
+    });
+
+    const wrongBot = await post(
+      "/telegram/miniapp/signin",
+      {
+        campaignSlug: "spring-sale",
+        initData: miniApp(51),
+      },
+      "",
+      "https://publisher.example"
+    );
+    expect(wrongBot.status).toBe(401);
+    expect(db.user).toHaveLength(1);
+    expect(db.session).toHaveLength(1);
   });
 
   it("does not issue a session if user validation removes the Telegram account", async () => {

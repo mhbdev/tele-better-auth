@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["./client-consumer.ts"]
+  "include": ["./client-consumer.ts", "./server-consumer.ts"]
 }

@@ -23,12 +23,19 @@ export type {
   TelegramMappedUser,
   TelegramMiniAppChat,
   TelegramMiniAppData,
+  TelegramMiniAppInitDataVerifier,
   TelegramMiniAppUser,
+  TelegramMiniAppVerificationResult,
   TelegramOIDCClaims,
   TelegramOIDCOptions,
   TelegramPluginOptions,
   TelegramUserMapper,
 } from "./types";
+export {
+  parseMiniAppInitData,
+  validateMiniAppData,
+  verifyMiniAppInitData,
+} from "./verify";
 
 /**
  * Telegram authentication plugin for Better Auth

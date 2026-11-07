@@ -6,7 +6,7 @@ The exported TypeScript interfaces describe the complete API. Keep secrets in th
 
 | Option | Default | Behavior |
 | --- | --- | --- |
-| `botToken` | none | Required for Widget/Mini App HMAC verification. |
+| `botToken` | none | Required for Widget and default Mini App HMAC verification. It may be omitted for Mini App-only setups with `loginWidget: false` and `miniApp.verifyInitData`. |
 | `botUsername` | none | Required when the Widget is enabled; omit `@`. |
 | `loginWidget` | `true` | Register Widget sign-in, link and unlink endpoints. |
 | `autoCreateUser` | `true` | Allow verified first-time sign-ins to create users; supplies the default OIDC signup policy. |
@@ -14,6 +14,7 @@ The exported TypeScript interfaces describe the complete API. Keep secrets in th
 | `maxAuthAge` | `86400` | Maximum HMAC payload age in seconds; finite and nonnegative. Future timestamps are rejected. |
 | `mapTelegramDataToUser` | name and image | Map verified Widget data when creating a user. |
 | `miniApp.enabled` | `false` | Register Mini App sign-in, validate, link and unlink routes. |
+| `miniApp.verifyInitData` | none | Server-only verifier for publisher-owned Mini Apps; receives raw initData, Better Auth request context, and extra body fields. When absent, the plugin verifies with `botToken`. |
 | `miniApp.allowAutoSignin` | `true` | Allow Mini App user creation together with `autoCreateUser`. |
 | `miniApp.mapMiniAppDataToUser` | name and image | Map verified Mini App user data when creating a user. |
 | `miniApp.validateInitData` | `true` | Deprecated; `false` is rejected. Verification cannot be disabled. |

@@ -19,8 +19,14 @@ const server = await import("../dist/index.js");
 const client = await import("../dist/client.js");
 const require = createRequire(import.meta.url);
 assert.equal(typeof require("../dist/index.cjs").telegram, "function");
+assert.equal(
+  typeof require("../dist/index.cjs").verifyMiniAppInitData,
+  "function"
+);
 assert.equal(typeof require("../dist/client.cjs").telegramClient, "function");
 assert.equal(typeof server.telegramOAuth, "function");
+assert.equal(typeof server.verifyMiniAppInitData, "function");
+assert.equal(typeof server.parseMiniAppInitData, "function");
 assert.equal(client.telegramClient().id, "telegram");
 assert.equal(
   server.telegram({ botToken: "123:token", botUsername: "bot" }).id,

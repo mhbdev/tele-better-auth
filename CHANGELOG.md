@@ -5,6 +5,17 @@ All notable changes to the tele-better-auth plugin will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-11-07
+
+### Added
+
+- Add a server-side Mini App `verifyInitData` callback for publisher-owned apps that resolve the correct bot token per campaign and request origin.
+- Export Mini App parsing, structural validation, and bot-token verification helpers for custom server verification.
+
+### Security
+
+- Keep duplicate-key, hash-format, freshness, structural, and signed-user identity checks in place for custom Mini App verification.
+
 ## [1.7.2] - 2026-11-07
 
 ### Security

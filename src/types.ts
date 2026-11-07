@@ -1,3 +1,5 @@
+import type { GenericEndpointContext } from "@better-auth/core";
+
 /**
  * Data returned by Telegram Login Widget
  */
@@ -56,6 +58,26 @@ export interface TelegramMiniAppData {
   start_param?: string;
   user?: TelegramMiniAppUser;
 }
+
+/**
+ * A Mini App verifier must independently authenticate the exact raw initData
+ * before returning its parsed data or user. Falsy results reject sign-in.
+ */
+export type TelegramMiniAppVerificationResult =
+  | TelegramMiniAppData
+  | TelegramMiniAppUser
+  | false
+  | null
+  | undefined;
+
+/** Server-only verifier for Mini App initData from publisher-owned bots. */
+export type TelegramMiniAppInitDataVerifier = (
+  initData: string,
+  context: GenericEndpointContext,
+  extraFields: Readonly<Record<string, unknown>>
+) =>
+  | TelegramMiniAppVerificationResult
+  | Promise<TelegramMiniAppVerificationResult>;
 
 /**
  * JWT ID token claims from Telegram OIDC
@@ -227,6 +249,15 @@ export interface TelegramPluginOptions {
      * Custom function to map Mini App user data to user object
      */
     mapMiniAppDataToUser?: TelegramUserMapper<TelegramMiniAppUser>;
+
+    /**
+     * Verify raw initData with a server-resolved bot token. The callback gets
+     * the request context and body fields other than `initData`. Its falsy
+     * result rejects the request. When configured, `botToken` is optional if
+     * the Login Widget is disabled; the callback is used for sign-in, linking,
+     * and validation routes.
+     */
+    verifyInitData?: TelegramMiniAppInitDataVerifier;
   };
 
   /**

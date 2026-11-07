@@ -38,6 +38,7 @@ describe("createPluginConfig", () => {
     expect(config.miniAppAllowAutoSignin).toBe(true);
     expect(config.mapTelegramDataToUser).toBeUndefined();
     expect(config.mapMiniAppDataToUser).toBeUndefined();
+    expect(config.verifyMiniAppInitData).toBeUndefined();
     expect(config.oidc).toBeUndefined();
     expect(config.oidcClientId).toBe("123456789");
   });
@@ -60,6 +61,17 @@ describe("createPluginConfig", () => {
       miniApp: { enabled: true },
     });
     expect(config.miniAppEnabled).toBe(true);
+  });
+
+  it("allows a Mini App verifier to resolve publisher bots without a default bot token", () => {
+    const verifier = vi.fn();
+    const config = createPluginConfig({
+      loginWidget: false,
+      miniApp: { enabled: true, verifyInitData: verifier },
+    });
+
+    expect(config.botToken).toBe("");
+    expect(config.verifyMiniAppInitData).toBe(verifier);
   });
 
   it("oidc.enabled: true enables OIDC", () => {
@@ -87,6 +99,7 @@ describe("createPluginConfig", () => {
 
   it("passes miniApp sub-options through", () => {
     const mapper = () => ({ name: "custom" });
+    const verifier = vi.fn();
     const config = createPluginConfig({
       ...BASE,
       miniApp: {
@@ -94,11 +107,13 @@ describe("createPluginConfig", () => {
         enabled: true,
         mapMiniAppDataToUser: mapper,
         validateInitData: true,
+        verifyInitData: verifier,
       },
     });
     expect(config.miniAppValidateInitData).toBe(true);
     expect(config.miniAppAllowAutoSignin).toBe(false);
     expect(config.mapMiniAppDataToUser).toBe(mapper);
+    expect(config.verifyMiniAppInitData).toBe(verifier);
   });
 
   // ── Custom overrides ───────────────────────────────────────────────
