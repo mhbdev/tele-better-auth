@@ -22,9 +22,11 @@ The validate action checks authenticity and returns `{ valid, data }`; it does n
 
 ## Publisher-owned Mini Apps
 
-When campaigns use different Telegram bots, resolve the owning bot on the server and verify each raw payload with that bot's token. Configure `miniApp.verifyInitData`; the plugin then uses it for sign-in, linking, and validation. The normal `botToken` verifier remains the default when this callback is absent. A Mini App-only setup may omit `botToken` when `loginWidget: false` and the callback is configured.
+When campaigns use different Telegram bots, resolve the owning bot on the server and verify each raw payload for that bot. Configure `miniApp.verifyInitData`; the plugin then uses it for sign-in, linking, and validation. The normal `botToken` HMAC verifier remains the default when this callback is absent. A Mini App-only setup may omit `botToken` when `loginWidget: false` and the callback is configured.
 
-The callback receives the raw `initData`, Better Auth's request context, and extra request body fields with `initData` removed. The fields are untrusted input. Resolve a campaign from its slug and a server-verified/allowlisted origin, then fetch that campaign's bot token from server-side storage. Never select a bot token from a client-supplied bot ID.
+The callback receives the raw `initData`, Better Auth's request context, and extra request body fields with `initData` removed. Send those fields from the client with `extraFields`, for example `authClient.signInWithMiniApp(initData, { extraFields: { campaignSlug } })` or `authClient.autoSignInFromMiniApp({ extraFields: { campaignSlug } })`. The fields and `Origin` header are request input: resolve the campaign using the slug and an exact server-side origin allowlist, then resolve its verified Telegram bot ID from your own storage. Never select the bot from a client-supplied bot ID.
+
+If your platform stores each bot token, verify the payload with that token using `verifyMiniAppInitData`, as in the example below. If you do not retain bot tokens, the callback can instead verify Telegram's documented third-party Ed25519 signature using the campaign's server-resolved bot ID and Telegram's public key. After authenticating the exact raw payload, return its verified `TelegramMiniAppData` or `user`. The callback performs the application's cryptographic verification; the plugin does not automatically perform Telegram's third-party signature verification.
 
 The plugin still checks duplicate parameters, hash shape, freshness, and returned user structure. `maxAuthAge` is an upper bound even when using a custom verifier. A successful callback must return verified `TelegramMiniAppData` or its verified `user`; return `false`, `null`, or `undefined` to reject.
 
@@ -66,7 +68,7 @@ export const telegramPlugin = telegram({
 });
 ```
 
-`findCampaignForVerifiedOrigin` and `getServerBotToken` represent application server lookups. Check that the campaign is active and its origin is registered to the publisher before returning its bot ID. Do not accept a bot ID from `fields` as the lookup key. `verifyMiniAppInitData`, `parseMiniAppInitData`, and `validateMiniAppData` are server-side package exports for implementing this flow.
+`findCampaignForVerifiedOrigin` and `getServerBotToken` represent application server lookups. Check that the campaign is active and its origin is registered to the publisher before returning its bot ID. Do not accept a bot ID from `fields` as the lookup key. `verifyMiniAppInitData`, `parseMiniAppInitData`, and `validateMiniAppData` are server-side package exports for implementing token based verification. The `extraFields` option is available on Mini App sign-in, auto sign-in, validation, and linking client actions.
 
 ## Telegram Web and cross-origin deployments
 

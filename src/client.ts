@@ -34,6 +34,12 @@ type ClientOptions = Parameters<ClientGetActions>[2];
 export type TelegramFetchOptions = ClientFetchOption;
 type FetchOptions = TelegramFetchOptions;
 
+/** Fetch options and additional request fields for Mini App endpoints. */
+export type TelegramMiniAppFetchOptions = TelegramFetchOptions & {
+  /** Extra untrusted fields passed to the server-side Mini App verifier. */
+  extraFields?: Readonly<Record<string, unknown>>;
+};
+
 export interface TelegramClientOptions {
   /** CSP nonce applied to scripts created by this plugin. */
   scriptNonce?: string;
@@ -628,8 +634,11 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
          * Auto sign-in from Telegram Mini App
          * Automatically retrieves initData from Telegram.WebApp and signs in
          * Only works when running inside a Telegram Mini App
+         * @param fetchOptions - Optional fetch settings and verifier extraFields
          */
-        autoSignInFromMiniApp: async (fetchOptions?: FetchOptions) => {
+        autoSignInFromMiniApp: async (
+          fetchOptions?: TelegramMiniAppFetchOptions
+        ) => {
           if (typeof window === "undefined") {
             throw new Error("This method can only be called in browser");
           }
@@ -641,10 +650,12 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
             );
           }
 
+          const { extraFields, ...requestOptions } = fetchOptions ?? {};
+
           return await $fetch("/telegram/miniapp/signin", {
-            body: { initData },
+            body: { ...extraFields, initData },
             method: "POST",
-            ...fetchOptions,
+            ...requestOptions,
           });
         },
 
@@ -807,12 +818,17 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
         },
 
         /** Link a verified Mini App identity to the current session. */
-        linkMiniApp: (initData: string, fetchOptions?: FetchOptions) =>
-          $fetch("/telegram/miniapp/link", {
-            ...fetchOptions,
-            body: { initData },
+        linkMiniApp: (
+          initData: string,
+          fetchOptions?: TelegramMiniAppFetchOptions
+        ) => {
+          const { extraFields, ...requestOptions } = fetchOptions ?? {};
+          return $fetch("/telegram/miniapp/link", {
+            ...requestOptions,
+            body: { ...extraFields, initData },
             method: "POST",
-          }),
+          });
+        },
 
         /**
          * Link current user account with Telegram
@@ -905,15 +921,17 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
         /**
          * Sign in with Telegram Mini App
          * @param initData - Raw initData string from Telegram.WebApp.initData
+         * @param fetchOptions - Optional fetch settings and verifier extraFields
          */
         signInWithMiniApp: async (
           initData: string,
-          fetchOptions?: FetchOptions
+          fetchOptions?: TelegramMiniAppFetchOptions
         ) => {
+          const { extraFields, ...requestOptions } = fetchOptions ?? {};
           const response = await $fetch("/telegram/miniapp/signin", {
-            body: { initData },
+            body: { ...extraFields, initData },
             method: "POST",
-            ...fetchOptions,
+            ...requestOptions,
           });
 
           return response;
@@ -1004,15 +1022,16 @@ export const telegramClient = (clientOptions: TelegramClientOptions = {}) => {
          */
         validateMiniApp: async (
           initData: string,
-          fetchOptions?: FetchOptions
+          fetchOptions?: TelegramMiniAppFetchOptions
         ) => {
+          const { extraFields, ...requestOptions } = fetchOptions ?? {};
           const response = await $fetch<{
             data: any;
             valid: boolean;
           }>("/telegram/miniapp/validate", {
-            body: { initData },
+            body: { ...extraFields, initData },
             method: "POST",
-            ...fetchOptions,
+            ...requestOptions,
           });
 
           return response;

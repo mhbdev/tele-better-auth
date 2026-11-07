@@ -749,6 +749,25 @@ describe("telegramClient", () => {
   });
 
   describe("Mini Apps methods", () => {
+    describe("linkMiniApp", () => {
+      it("should include verifier extra fields in the request body", async () => {
+        mockFetch.mockResolvedValueOnce({ data: {} });
+
+        const actions = client.getActions(mockFetch);
+        await actions.linkMiniApp("raw-init-data", {
+          extraFields: { campaignSlug: "spring-sale" },
+        });
+
+        expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/link", {
+          body: {
+            campaignSlug: "spring-sale",
+            initData: "raw-init-data",
+          },
+          method: "POST",
+        });
+      });
+    });
+
     describe("signInWithMiniApp", () => {
       it("should call correct endpoint with initData", async () => {
         const mockResponse = {
@@ -782,6 +801,23 @@ describe("telegramClient", () => {
         await expect(actions.signInWithMiniApp(initData)).rejects.toThrow(
           "Invalid initData"
         );
+      });
+
+      it("should include verifier extra fields in the request body", async () => {
+        mockFetch.mockResolvedValueOnce({ data: {} });
+
+        const actions = client.getActions(mockFetch);
+        await actions.signInWithMiniApp("raw-init-data", {
+          extraFields: { campaignSlug: "spring-sale" },
+        });
+
+        expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/signin", {
+          body: {
+            campaignSlug: "spring-sale",
+            initData: "raw-init-data",
+          },
+          method: "POST",
+        });
       });
     });
 
@@ -828,6 +864,23 @@ describe("telegramClient", () => {
 
         expect(result.data?.valid).toBe(false);
         expect(result.data?.data).toBeNull();
+      });
+
+      it("should include verifier extra fields in the request body", async () => {
+        mockFetch.mockResolvedValueOnce({ data: { data: null, valid: false } });
+
+        const actions = client.getActions(mockFetch);
+        await actions.validateMiniApp("raw-init-data", {
+          extraFields: { campaignSlug: "spring-sale" },
+        });
+
+        expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/validate", {
+          body: {
+            campaignSlug: "spring-sale",
+            initData: "raw-init-data",
+          },
+          method: "POST",
+        });
       });
 
       it("should handle errors", async () => {
@@ -909,6 +962,25 @@ describe("telegramClient", () => {
           method: "POST",
         });
         expect(result).toEqual(mockResponse);
+      });
+
+      it("should include verifier extra fields when auto-signing in", async () => {
+        const mockInitData = "raw-init-data";
+        (window as any).Telegram = { WebApp: { initData: mockInitData } };
+        mockFetch.mockResolvedValueOnce({ data: { session: {}, user: {} } });
+
+        const actions = client.getActions(mockFetch);
+        await actions.autoSignInFromMiniApp({
+          extraFields: { campaignSlug: "spring-sale" },
+        });
+
+        expect(mockFetch).toHaveBeenCalledWith("/telegram/miniapp/signin", {
+          body: {
+            campaignSlug: "spring-sale",
+            initData: mockInitData,
+          },
+          method: "POST",
+        });
       });
 
       it("should use signed launch data from the URL fragment before the SDK loads", async () => {

@@ -17,7 +17,7 @@ Paths are relative to Better Auth's base path, normally `/api/auth`.
 | POST | `/telegram/miniapp/link` | session + signed initData | Link numeric Telegram identity |
 | POST | `/telegram/miniapp/unlink` | fresh session | Unlink the shared identity |
 
-Widget routes require `loginWidget !== false`; Mini App routes require `miniApp.enabled`. Mini App POST bodies contain `{ initData: string }`. Widget sign-in/link bodies are the original signed `TelegramAuthData`. Unlink actions need no body.
+Widget routes require `loginWidget !== false`; Mini App routes require `miniApp.enabled`. Mini App POST bodies contain `{ initData: string, ...extraFields }`; client actions accept `TelegramMiniAppFetchOptions` with `extraFields` for server-side verifier context. Widget sign-in/link bodies are the original signed `TelegramAuthData`. Unlink actions need no body.
 
 `miniApp.verifyInitData(initData, context, extraFields)` is an optional server-only verifier. `extraFields` contains body fields other than `initData`; both it and `context.body` are untrusted request input. Return verified `TelegramMiniAppData` or `TelegramMiniAppUser`, or a falsy result to reject. The callback is used for Mini App sign-in, linking, and validation; without it, routes use `botToken` HMAC verification. `verifyMiniAppInitData`, `parseMiniAppInitData`, and `validateMiniAppData` are exported for server-side verifier implementations.
 
@@ -34,7 +34,7 @@ All fetch actions accept typed Better Fetch options as their final argument. Unl
 | `getTelegramConfig` | fetch options |
 | `signInWithTelegram` / `linkTelegram` | signed Widget data, fetch options |
 | `unlinkTelegram` | fetch options |
-| `signInWithMiniApp` / `linkMiniApp` / `validateMiniApp` | raw initData, fetch options |
+| `signInWithMiniApp` / `linkMiniApp` / `validateMiniApp` | raw initData, `TelegramMiniAppFetchOptions` |
 | `autoSignInFromMiniApp` | fetch options |
 | `unlinkMiniApp` | fetch options |
 | `signInWithTelegramOIDC` / `linkTelegramOIDC` | flow options, fetch options |

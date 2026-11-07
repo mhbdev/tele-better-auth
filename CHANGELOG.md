@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add a server-side Mini App `verifyInitData` callback for publisher-owned apps that resolve the correct bot token per campaign and request origin.
+- Add a server-side Mini App `verifyInitData` callback for publisher-owned apps that resolve the correct bot per campaign and request origin, including platforms that use Telegram's third-party Ed25519 signature instead of retaining bot tokens.
+- Allow Mini App client actions to send extra request fields such as `campaignSlug` to the server verifier.
 - Export Mini App parsing, structural validation, and bot-token verification helpers for custom server verification.
 
 ### Security

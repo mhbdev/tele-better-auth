@@ -78,7 +78,7 @@ Preserve existing trusted providers. Describe the effect of these choices to the
 
 For Widget/Mini App add `botToken` on the server, `botUsername` for Widget, and `miniApp: { enabled: true }` for Mini Apps. Regenerate the auth schema with the project's Better Auth CLI and database migration workflow. These flows add server-owned user fields `telegramId`, `telegramUsername`, `telegramPhoneNumber` and account fields `telegramId`, `telegramUsername`.
 
-For publisher-owned Mini Apps using multiple bots, configure `miniApp.verifyInitData`. It receives raw `initData`, the Better Auth request context, and extra request body fields such as `campaignSlug`; resolve the campaign against an allowlisted origin, then load its bot token from server-side storage and verify the exact payload. The exported `verifyMiniAppInitData`, `parseMiniAppInitData`, and `validateMiniAppData` helpers support this flow. Treat all client fields as untrusted and never select a bot token from a client-provided bot ID. A Mini App-only setup can omit `botToken` when this callback is configured and `loginWidget: false` is set. See the [publisher-owned Mini App guide](https://github.com/mhbdev/tele-better-auth/blob/main/docs/miniapps.md#publisher-owned-mini-apps).
+For publisher-owned Mini Apps using multiple bots, configure `miniApp.verifyInitData`. It receives raw `initData`, the Better Auth request context, and extra request body fields such as `campaignSlug`; clients send those with `extraFields` on Mini App sign-in, auto sign-in, validation, or linking. Resolve the campaign against an exact origin allowlist, then verify the exact raw payload with that bot's token or Telegram's third-party Ed25519 signature using the server-resolved bot ID and Telegram public key. The callback must return verified `TelegramMiniAppData` or its verified user. Treat all client fields as untrusted and never select a bot from a client-provided bot ID. A Mini App-only setup can omit `botToken` when this callback is configured and `loginWidget: false` is set. See the [publisher-owned Mini App guide](https://github.com/mhbdev/tele-better-auth/blob/main/docs/miniapps.md#publisher-owned-mini-apps).
 
 ## Browser behavior
 
@@ -86,7 +86,7 @@ For publisher-owned Mini Apps using multiple bots, configure `miniApp.verifyInit
 - OIDC linking: `linkTelegramOIDC({ callbackURL, flow, scopes })`.
 - JS token sign-in/link: `signInWithTelegramOIDCIdToken(idToken)` / `linkTelegramOIDCIdToken(idToken)`.
 - Widget sign-in/link: `signInWithTelegram(authData)` / `linkTelegram(authData)`.
-- Mini App sign-in/link: `signInWithMiniApp(initData)` / `linkMiniApp(initData)`.
+- Mini App sign-in/link: `signInWithMiniApp(initData, { extraFields })` / `linkMiniApp(initData, { extraFields })`.
 
 Call popup helpers directly from the user's click. They reserve one window synchronously and use `disableRedirect: true`; do not manually open another window or navigate the opener. Handle both returned `{ error }` and thrown popup/network failures. The promise reports authorization initiation, not authentication completion.
 

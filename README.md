@@ -179,7 +179,7 @@ const linked = await authClient.linkMiniApp(window.Telegram.WebApp.initData);
 const validation = await authClient.validateMiniApp(window.Telegram.WebApp.initData);
 ```
 
-`autoSignInFromMiniApp()` reads raw `initData` from Telegram's SDK, or from its signed launch URL fragment before the SDK loads. Mini App authentication and linking always verify the signature and timestamp. For publisher-owned Mini Apps that use multiple bots, `miniApp.verifyInitData` can resolve a campaign's server-side bot token and verify the raw payload; see [publisher-owned Mini Apps](docs/miniapps.md#publisher-owned-mini-apps). `miniApp.allowAutoSignin: false` prevents creating new Mini App users; existing linked users can still sign in. See [Mini App deployment notes](docs/miniapps.md) for cross-origin and Telegram Web cookie configuration.
+`autoSignInFromMiniApp()` reads raw `initData` from Telegram's SDK, or from its signed launch URL fragment before the SDK loads. Mini App authentication and linking always verify the signature and timestamp. For publisher-owned Mini Apps that use multiple bots, `miniApp.verifyInitData` can resolve the campaign's server-side bot and verify the raw payload with either its token or Telegram's third-party Ed25519 signature. The client can pass campaign metadata with `extraFields`, for example `authClient.signInWithMiniApp(initData, { extraFields: { campaignSlug } })`; see [publisher-owned Mini Apps](docs/miniapps.md#publisher-owned-mini-apps). `miniApp.allowAutoSignin: false` prevents creating new Mini App users; existing linked users can still sign in. See [Mini App deployment notes](docs/miniapps.md) for cross-origin and Telegram Web cookie configuration.
 
 ## Configuration and account controls
 

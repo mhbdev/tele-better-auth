@@ -1,9 +1,16 @@
 /** @vitest-environment node */
-import { createHash, createHmac } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  generateKeyPairSync,
+  type KeyObject,
+  sign as signEd25519,
+  verify as verifyEd25519,
+} from "node:crypto";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it, vi } from "vitest";
-import { parseMiniAppInitData, telegram, verifyMiniAppInitData } from "./index";
+import { parseMiniAppInitData, telegram } from "./index";
 
 const botToken = "123456789:server-secret";
 function widget(id = 42) {
@@ -43,6 +50,36 @@ function miniApp(id = 42, overrides = {}, token = botToken) {
       .digest("hex")
   );
   return params.toString();
+}
+function thirdPartyMiniApp(id: number, botId: number, privateKey: KeyObject) {
+  const params = new URLSearchParams({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    hash: "a".repeat(64),
+    user: JSON.stringify({ first_name: "Alice", id }),
+  });
+  const dataCheckString = [
+    `${botId}:WebAppData`,
+    ...Array.from(params.entries())
+      .filter(([key]) => key !== "hash")
+      .sort(([left], [right]) => compareKeys(left, right))
+      .map(([key, value]) => `${key}=${value}`),
+  ].join("\n");
+  params.set(
+    "signature",
+    signEd25519(null, Buffer.from(dataCheckString), privateKey).toString(
+      "base64url"
+    )
+  );
+  return params.toString();
+}
+function compareKeys(left: string, right: string) {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
 }
 function setup(extra = {}, pluginOptions = {}) {
   const db: {
@@ -125,8 +162,9 @@ describe("real Better Auth endpoint integration", () => {
   });
 
   it("verifies publisher-owned Mini App data using the server-resolved campaign bot", async () => {
-    const publisherToken = "987654321:publisher-secret";
-    const verifier = vi.fn(async (initData, ctx, fields) => {
+    const publisherBotId = 987654321;
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const verifier = vi.fn((initData, ctx, fields) => {
       const { campaignSlug } = fields;
       if (
         campaignSlug !== "spring-sale" ||
@@ -134,10 +172,30 @@ describe("real Better Auth endpoint integration", () => {
       ) {
         return false;
       }
-      if (!(await verifyMiniAppInitData(initData, publisherToken, 600))) {
+      const params = new URLSearchParams(initData);
+      const signature = params.get("signature");
+      params.delete("hash");
+      params.delete("signature");
+      const dataCheckString = [
+        `${publisherBotId}:WebAppData`,
+        ...Array.from(params.entries())
+          .sort(([left], [right]) => compareKeys(left, right))
+          .map(([key, value]) => `${key}=${value}`),
+      ].join("\n");
+      if (
+        !(
+          signature &&
+          verifyEd25519(
+            null,
+            Buffer.from(dataCheckString),
+            publicKey,
+            Buffer.from(signature, "base64url")
+          )
+        )
+      ) {
         return false;
       }
-      return parseMiniAppInitData(initData);
+      return parseMiniAppInitData(initData).user;
     });
     const { db, post } = setup(
       {
@@ -156,7 +214,7 @@ describe("real Better Auth endpoint integration", () => {
       {
         botId: "client-value-is-ignored",
         campaignSlug: "spring-sale",
-        initData: miniApp(50, {}, publisherToken),
+        initData: thirdPartyMiniApp(50, publisherBotId, privateKey),
       },
       "",
       "https://publisher.example"
@@ -173,7 +231,7 @@ describe("real Better Auth endpoint integration", () => {
       "/telegram/miniapp/signin",
       {
         campaignSlug: "spring-sale",
-        initData: miniApp(51),
+        initData: thirdPartyMiniApp(51, publisherBotId + 1, privateKey),
       },
       "",
       "https://publisher.example"
